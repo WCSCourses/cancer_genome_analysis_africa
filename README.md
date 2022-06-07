@@ -1,4 +1,4 @@
-# Cancer Genome Analysis Africa
+# Cancer Genome Analysis - Africa (Virtual)
 
 Thank you for working with Wellcome Connecting Science Course! 
 
