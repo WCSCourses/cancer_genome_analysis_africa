@@ -1,4 +1,4 @@
-# Base repository
+# Cancer Genome Analysis Africa
 
 Thank you for working with Wellcome Connecting Science Course! 
 
