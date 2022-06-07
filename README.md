@@ -36,3 +36,18 @@ Next generation sequencing technologies
 Online databases
 
 <a href="https://coursesandconferences.wellcomeconnectingscience.org/event/cancer-genome-analysis-africa-virtual-20220912/" target="_blank">Course website</a>
+
+# Instructors
+
+Daniela Robles-Espinoza, LIIGH-UNAM, Mexico
+Hannah Ayettey, Korle Bu Teaching Hospital, Ghana
+Solomon Rotimi, Covenant University, Nigeria
+
+Nyasha Chambwe, Feinstein Institutes for Medical Research, USA
+Eric Dawson, Nvidia, USA
+Pedro Fernandez, Stellenbosch University, South Africa
+Mariana Boroni, INCA, Brazil
+Ludmil Alexandrov, UCSD, USA
+Floris Barthel, Translational Genomics Research Institute (TGen), USA
+Federico Abascal, Sanger Institute, UK
+Shakuntala Baichoo, University of Mauritius, Mauritius
