@@ -51,3 +51,9 @@ Ludmil Alexandrov, UCSD, USA
 Floris Barthel, Translational Genomics Research Institute (TGen), USA
 Federico Abascal, Sanger Institute, UK
 Shakuntala Baichoo, University of Mauritius, Mauritius
+
+# Timetable
+
+Download here
+
+# Course Manual
