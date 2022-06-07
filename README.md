@@ -34,3 +34,5 @@ Sample collection, preparation, storage and processing
 Molecular diagnostic applications and limitations
 Next generation sequencing technologies
 Online databases
+
+<a href="https://coursesandconferences.wellcomeconnectingscience.org/event/cancer-genome-analysis-africa-virtual-20220912/" target="_blank">Course website</a>
