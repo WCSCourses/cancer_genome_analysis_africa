@@ -10,7 +10,7 @@ The course will be led by experts in cancer genomics from Africa and Latin Ameri
 
 To train Africa-based scientists to analyse genomics data from cancer samples. Applying African datasets, participants will benefit from hands-on practical exercises in mutation calling, driver gene identification, mutational signature analysis and RNA deconvolution.
 
-Topics to be covered
+<h3>Topics to be covered:</h3>
 
 Data formats and organisation in cancer NGS studies
 Somatic mutation calling
