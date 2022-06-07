@@ -57,3 +57,11 @@ Shakuntala Baichoo, University of Mauritius, Mauritius
 Download here
 
 # Course Manual
+
+*** Module 1
+
+*** Module 2
+
+*** Module 3
+
+*** Module 4
