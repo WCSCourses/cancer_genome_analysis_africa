@@ -39,18 +39,18 @@ Online databases
 
 # Instructors
 
-Daniela Robles-Espinoza, LIIGH-UNAM, Mexico
-Hannah Ayettey, Korle Bu Teaching Hospital, Ghana
-Solomon Rotimi, Covenant University, Nigeria
+Daniela Robles-Espinoza, LIIGH-UNAM, Mexico<br>
+Hannah Ayettey, Korle Bu Teaching Hospital, Ghana<br>
+Solomon Rotimi, Covenant University, Nigeria<br>
 
-Nyasha Chambwe, Feinstein Institutes for Medical Research, USA
-Eric Dawson, Nvidia, USA
-Pedro Fernandez, Stellenbosch University, South Africa
-Mariana Boroni, INCA, Brazil
-Ludmil Alexandrov, UCSD, USA
-Floris Barthel, Translational Genomics Research Institute (TGen), USA
-Federico Abascal, Sanger Institute, UK
-Shakuntala Baichoo, University of Mauritius, Mauritius
+Nyasha Chambwe, Feinstein Institutes for Medical Research, USA<br>
+Eric Dawson, Nvidia, USA<br>
+Pedro Fernandez, Stellenbosch University, South Africa<br>
+Mariana Boroni, INCA, Brazil<br>
+Ludmil Alexandrov, UCSD, USA<br>
+Floris Barthel, Translational Genomics Research Institute (TGen), USA<br>
+Federico Abascal, Sanger Institute, UK<br>
+Shakuntala Baichoo, University of Mauritius, Mauritius<br>
 
 # Timetable
 
