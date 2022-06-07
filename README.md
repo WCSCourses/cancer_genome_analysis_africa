@@ -6,7 +6,7 @@ This new course, in collaboration with the AORTIC, will provide Africa-based sci
 
 The course will be led by experts in cancer genomics from Africa and Latin America, as well as research and industry experts based in the USA and UK. 
 
-# Course objective
+<h2>Course objective</h2>
 
 To train Africa-based scientists to analyse genomics data from cancer samples. Applying African datasets, participants will benefit from hands-on practical exercises in mutation calling, driver gene identification, mutational signature analysis and RNA deconvolution.
 
