@@ -1,0 +1,21 @@
+Donor ID,Gender,Age,Tobacco intake*,Alcohol intake†,BMI,Additional Information,Targeted,Exome,WGS,packyears
+T01_25F,Female,25,Smoker (5),Rare,24,-,190 (146),45 (44),3 (2),5
+T02_35F,Female,35,Ex-smoker (1),Rare,24,Hemangiopericytoma,187 (177),31 (30),3 (2),1
+T03_53F,Female,53,Smoker (30),Rare,39,-,93 (89),31 (30),6 (5),30
+T04_55M,Male,55,Smoker (40),Heavy,28,Benign testicular lump,-,39 (38),4 (3),40
+T05_58M,Male,58,Smoker (12),Heavy,22,-,-,21 (17),3 (2),12
+T06_59M,Male,59,Ex-smoker (25),Moderate,26,-,103 (98),31 (30),4 (2),25
+T07_59M,Male,59,Smoker (2),Rare,25,Heroin user,94 (92),33 (32),3 (2),2
+T08_61F,Female,61,Smoker (5),None,28,History of UTIs,312 (305),30 (28),18 (17),5
+T09_61M,Male,61,Non-smoker,Rare,29,-,84 (77),40 (39),3 (2),0
+T10_68F,Female,68,Non-smoker,Rare,34,Thyroid adenoma / nodal hyperplasia,-,34 (31),3 (2),0
+T11_69F,Female,69,Non-smoker,Rare,24,UTI; lymphoma,155 (143),36 (35),5 (3),0
+T12_70M,Male,70,Ex-smoker (11),Rare,25,-,111 (87),49 (38),3 (2),11
+T13_71F,Female,71,Non-smoker,Light,19,-,123 (105),37 (36),4 (3),0
+T14_75F,Female,75,Non-smoker,Light,27,Type 2 diabetes; benign breast lump,-,40 (36),3 (2),0
+T15_78F,Female,78,Non-smoker,Rare,22,-,61 (59),21 (20),7 (6),0
+C01_49M,Male,49,Ex-smoker (30),NR,34,pT1G3 & CIS,24 (0),40 (0),4 (0),30
+C02_61F,Female,61,Non-smoker,NR,30,pT2G3. 4 cycles of chemotherapy,65 (55),14 (13),4 (3),0
+C03_67M,Male,67,Ex-smoker (20),NR,25,pT2G3,98 (29),42 (12),11 (3),20
+C04_72M,Male,72, Ex-smoker (25),NR,23,pT1G3 & CIS,169 (129),40 (33),13 (8),25
+C05_75M,Male,75,Non-smoker,NR,30,pT1G3 & CIS,45 (37),21 (14),4 (1),0
