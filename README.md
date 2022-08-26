@@ -60,10 +60,12 @@ Download here
 
 # Course Manual
 
-** Module 1 **
+** Module 1 **Data Formats & QC
 
-** Module 2 **
+** Module 2 **Mutation Calling
 
-** Module 3 **
+** Module 3 **Driver Gene Identification & Oncoplots
 
-** Module 4 **
+** Module 4 **Mutation Signatures
+
+** Module 5 **RNA Decovolution
