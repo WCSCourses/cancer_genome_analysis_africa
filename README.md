@@ -1,4 +1,5 @@
 <img src="https://coursesandconferences.wellcomeconnectingscience.org/wp-content/themes/wcc_courses_and_conferences/dist/assets/svg/logo.svg" width="200" height="200">
+
 # Cancer Genome Analysis - Africa (Virtual)
 
 Cancer is one of the leading causes of death in the world. In Africa, nearly 1 million cases and over 0.5 million deaths were reported in 2018. Being a genetic disease, its burden and outcome are influenced by baseline genetics that vary across human populations. However, studies on cancer genetic susceptibility and interventions are largely based in the global north, resulting in disproportionate representation of African datasets and research. Therefore, there is an urgent need to address the widening global disparities in cancer genomics research to include more global populations. 
