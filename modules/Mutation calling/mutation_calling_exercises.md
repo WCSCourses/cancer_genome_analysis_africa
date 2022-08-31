@@ -55,7 +55,16 @@ Below, we ask some concept and knowledge questions before moving on to analyzing
 
 ```
 
-3. To call somatic variants, we do the following:
+3. Let's say our tumor has a mutation burden of 1.5 mutations per _megabase_. Approximately how many mutations does
+this tumor have in total?
+
+```
+
+
+
+```
+
+4. To call somatic variants, we do the following:
 - Call all mutations in the tumor
 - Call all mutations in the normal
 - Subtract out the germline background to generate somatic alls.
@@ -124,10 +133,57 @@ of a string so we must enclose in single quotes.
 
 To align our reads, we run the following command:
 ```bash
-bwa mem -Y -t 2 -K 100000 -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' ~/references/Homo_sapiens_assembly38.fasta TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_1.fastq.gz TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_2.fastq.gz | samtools sort -@ 2 -o chr22.TCRBOA6-Normal.bam -
+bwa mem \
+    -Y \
+    -t 2 \
+    -K 100000 \
+    -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' \
+    ~/references/Homo_sapiens_assembly38.fasta \
+    TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_1.fastq.gz TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_2.fastq.gz \
+    | samtools sort \
+    -@ 2 \
+    -o chr22.TCRBOA6-Normal.bam -
+```
+Expected runtime: 30-50 minutes.
+
+The `samtools sort` command will write a sorted BAM file (since the default output of BWA is unsorted SAM).
+Sorting means that alignments appear in the file in their order along the genome (i.e., the 1st position of chromosome 1 is
+at the start of the file and the last alignment in the file will be on the last chromosome). This makes it possible to 
+index our BAM later.
+
+Let's check if our BAM is valid - we can do so with `samtools quickcheck`:
+
+```bash
+samtools quickcheck chr22.TCRBOA6-Normal.bam
 ```
 
-The `samtools sort` command help us write a sorted BAM file (since the default output of BWA is unsorted SAM).
+Expected runtime: 1 second.
+
+This command should return nothing and report nothing if everything is in order.
+
+Are there other commands we might use for BAM quality control?
+
+```
+
+
+```
+
+
+Lastly, we need to do the same process for our tumor. This will take longer to align - expect roughly an hour (but
+remember, these files have already been provided for you).
+
+```bash
+bwa mem \
+    -Y \
+    -t 2 \
+    -K 100000 \
+    -R '@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1' \
+    ~/references/Homo_sapiens_assembly38.fasta \
+    TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Tumor_1.fastq.gz TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Tumor_2.fastq.gz \
+    | samtools sort \
+    -@ 2 \
+    -o chr22.TCRBOA6-Tumor.bam -
+```
 
 #### Duplicate Marking
 Once we've aligned our reads we need to perform some additional steps to normalize our data. The first of these is duplicate
@@ -137,23 +193,91 @@ can distort our variant calls downstream if not removed.
 We'll use the Picard MarkDuplicates tool to mark duplicates. Conveniently, this is now integrated into the Genome Analysis Toolkit.
 
 ```bash
-gatk MarkDuplicates --java-options -Xmx30g -I=cpu.bam -O=mark_dups_cpu.bam \
--M=metrics.txt --TMP_DIR=/raid/myrun
+gatk MarkDuplicates \
+    --java-options -Xmx4g \
+    -I chr22.TCRBOA6-Normal.bam\
+    -O chr22.TCRBOA6-Normal.markdups.bam \
+    -M chr22.TCRBOA6-Normal.metrics.txt
+```
+
+We'll need to do the same for our tumor sample:
+
+```bash
+gatk MarkDuplicates \
+    --java-options -Xmx4g \
+    -I chr22.TCRBOA6-Tumor.bam\
+    -O chr22.TCRBOA6-Tumor.markdups.bam \
+    -M chr22.TCRBOA6-Tumor.metrics.txt
+```
+
+Expected runtime: 1 minute per sample
+
+The MarkDuplicates tool prints some statistics to stdout / stderr when it's finished. How long did the run take?
+
+```
+
+
+```
+
+How many unmapped reads were present? (hint: check the metrics.txt file)
+
+```
+
+
+```
+
+What percent of reads were optical duplicates?
+
+```
+
+
 ```
 
 #### Base Quality Score Recalibration
 
+The next step in the process is to generate a Base Quality Score Recalibration (BQSR) report.
+The BQSR process will normalize the quality scores within a BAM file based on a set of known variants
+(especially indels), resulting in more accurate variant calls downstream.
+
 ```bash
-gatk BaseRecalibrator --java-options -Xmx30g --input mark_dups_cpu.bam --output \
-recal_cpu.txt --known-sites Ref/Homo_sapiens_assembly38.known_indels.vcf.gz \
---reference Ref/Homo_sapiens_assembly38.fasta
+gatk BaseRecalibrator \
+    --java-options -Xmx4g \
+    --input chr22.TCRBOA6-Normal.markdups.bam \
+    --output chr22.TCRBOA6-Normal.markdups.BQSR-REPORT.txt \
+    --known-sites ~/references/Homo_sapiens_assembly38.known_indels.vcf.gz \
+    --reference ~/references/Homo_sapiens_assembly38.fasta
 ```
+
+
+```bash
+gatk BaseRecalibrator \
+    --java-options -Xmx4g \
+    --input chr22.TCRBOA6-Tumor.markdups.bam \
+    --output chr22.TCRBOA6-Tumor.markdups.BQSR-REPORT.txt \
+    --known-sites ~/references/Homo_sapiens_assembly38.known_indels.vcf.gz \
+    --reference ~/references/Homo_sapiens_assembly38.fasta
+```
+
+
+
+Expected runtime: 5 minutes for normal, 10 minutes for tumor.
+
+
+
+What is the name of the read group in the BQSR Report for the normal sample? Note that
+it should be the same as we generated for alignment.
+
+```
+
+
+```
+
 
 ## Variant calling
 
 ```bash
 gatk Mutect2 \
-    -R Ref/Homo_sapiens_assembly38.fasta \
+    -R ~references/Homo_sapiens_assembly38.fasta \
     --input tumor.bam \
     --tumor-sample tumor \
     --input normal.bam \
@@ -161,4 +285,9 @@ gatk Mutect2 \
     --output output.vcf
 ```
 
+We now have a somatic VCF file from MuTect2. But before we start looking for driver mutations or 
+mutational signatures, we should run some basic quality control and assess some of our variants in IGV.
+The following section will give a brief overview of quality control and assessment techniques.
+
 ## Variant assessment and quality control
+
