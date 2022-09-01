@@ -1,0 +1,256 @@
+---
+title: "Deconvolution Analysis with CIBERSORT"
+author: Cristiane Esteves, Mariana Boroni - Bioinformatics and Computational Biology Lab (LBBC/INCA-RJ)
+data: 2022-08-01
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+#Load libPaths.
+.libPaths(c("~/deconv_cibersort/deconv_cibersort/lib/","/home/manager/R/x86_64-pc-linux-gnu-library/4.2"))
+#pkgs <- c("survival", "survminer", "data.table", "dplyr", "ggplot2", "e1071", "parallel", "preprocessCore", "corrplot", "RColorBrewer", "parallel", "ggdendro")
+#install.packages(pkgs)
+
+```
+
+```{r}
+#Load Packages
+suppressPackageStartupMessages({
+  library(tibble)
+  library(dplyr)
+  library(ggplot2)
+  library(survival)
+  library(survminer)
+  library(e1071)
+  library(parallel)
+  library(preprocessCore)
+  library(data.table)
+  library(corrplot)
+  library(RColorBrewer)
+  library(readr)
+})
+
+#read script CIBERSORT and barplot function
+source('CIBERSORT.R')
+source('barplot_cibersort.R')
+
+```
+
+#Load signature matrix (LM22) and bulk RNA matrix (SKCM-Metastasis)
+LM22 is the signature genes file we used for Cibersort analyses (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4739640/). The file contains expression counts for 547 signature genes (547 rows) for 22 distinct human immune cells (22 columns).
+
+```{r}
+
+lm22_signatures <- as.data.frame(fread("~/deconv_cibersort/deconv_cibersort/data/lm22.txt"))
+print(head(lm22_signatures[,1:4]))
+
+lm22_signatures <- tibble::column_to_rownames(lm22_signatures, "V1")
+
+#Bulk TCGA-SKCM metastatic
+skcm_bulk <- as.data.frame(fread("~/deconv_cibersort/deconv_cibersort/data/bulk.txt"))
+
+skcm_bulk <- tibble::column_to_rownames(skcm_bulk, "V1")
+print(head(skcm_bulk[,1:4]))
+
+```
+
+
+#Deconvolution Analysis - CIBERSORT
+
+i)   perm = No. permutations; set to >=100 to calculate p-values (default = 0)
+       ii)  QN = Quantile normalization of input mixture (default = TRUE) - (disabling is recommended for RNA-Seq data)
+       iii) absolute = Run CIBERSORT in absolute mode (default = FALSE)
+               - note that cell subsets will be scaled by their absolute levels and will not be
+                 represented as fractions (to derive the default output, normalize absolute
+                 levels such that they sum to 1 for each mixture sample)
+               - the sum of all cell subsets in each mixture sample will be added to the ouput
+                 ('Absolute score'). If LM22 is used, this score will capture total immune content. 
+
+```{r}
+set.seed(42)
+h1 <- Sys.time()
+results.cibersort <- CIBERSORT(lm22_signatures, skcm_bulk, perm = 100, absolute = F, QN = F)
+h2 <- Sys.time()
+print(h2 - h1)
+
+results.sign = as.data.frame(results.cibersort)[which(as.data.frame(results.cibersort)$`P-value` <= 0.05),]
+results.sign = results.sign[1:22]
+```
+```{r}
+saveRDS(results.sign, "~/deconv_cibersort/deconv_cibersort/results_cibersort.rds")
+```
+
+# Multivariate/survival analysis
+
+```{r fig.height=10, fig.width=8}
+
+############################ multivariate/survival analysis ##########
+library(dplyr)
+library(survival)
+library(survminer)
+
+dados_SKCM = readRDS("~/deconv_cibersort/deconv_cibersort/data/Dados_SKCM.rds")
+library(readr)
+subtipos <- read_csv("data/subtipos.csv")
+
+###### metastatic melanoma #####
+
+#Identify the quartile of each sample in each cell type
+
+rownames(results.sign) <- substr(rownames(results.sign),1,12)
+
+results.sign1 <- results.sign
+for (i in 1:length(colnames(results.sign))) {
+  for (j in 1:5) {
+    quant <- quantile(results.sign1[,i])
+    results.sign[which(results.sign1[,i] > quant[j]),i] <- j
+  }
+}
+
+results.sign$Mixture <- rownames(results.sign)
+
+#Aggregate the cibersort result with clinical data
+
+forest_data <- left_join(results.sign,dados_SKCM$survival_met[,c(1,8,16,17,2,5)], by= c("Mixture" = "bcr_patient_barcode"))
+forest_data <- left_join(forest_data,subtipos[,c(2,10)], by= c("Mixture" = "pan.samplesID"))
+
+# Univariate Cox
+
+surv_object <- Surv(time = forest_data$OS.time, event = forest_data$OS)
+colnames(forest_data)[1:22] <- gsub(" ", "_", colnames(forest_data)[1:22])
+colnames(forest_data)[9] <- "Treg"
+colnames(forest_data)
+covariables <- colnames(forest_data)[c(1:22,27:29)]
+univ_formulas <- sapply(covariables, function(x) as.formula(paste('surv_object ~', x)))
+
+univ_models <- lapply(univ_formulas, function(x){coxph(x, data = forest_data)})
+
+univ_results <- lapply(univ_models,
+                              function(x){ 
+                                x <- summary(x)
+                                p.value<-signif(x$wald["pvalue"], digits=2)
+                                wald.test<-signif(x$wald["test"], digits=2)
+                                beta<-signif(x$coef[1], digits=2);#coeficient beta
+                                HR <-signif(x$coef[2], digits=2);#exp(beta)
+                                HR.confint.lower <- signif(x$conf.int[,"lower .95"], 2)
+                                HR.confint.upper <- signif(x$conf.int[,"upper .95"],2)
+                                HR <- paste0(HR, " (", 
+                                             HR.confint.lower, "-", HR.confint.upper, ")")
+                                res<-c(beta, HR, wald.test, p.value)
+                                names(res)<-c("beta", "HR (95% CI for HR)", "wald.test", 
+                                              "p.value")
+                                return(res)
+                                #return(exp(cbind(coef(x),confint(x))))
+                              })
+
+#res.bisque <- t(as.data.frame(univ_results, check.names = FALSE))
+res.bisque = as.data.frame(t(do.call(cbind, univ_results)))
+res.bisque <- as.data.frame(res.bisque)
+res.bisque$p.value <- as.character(res.bisque$p.value)
+res.bisque$p.value <- as.numeric(res.bisque$p.value)
+
+#Filter pval =< 0.05
+
+res.bisque_filt <- res.bisque[which(res.bisque$p.value <= 0.05),]
+
+res.bisque_filt
+
+rownames(res.bisque_filt)
+
+#Multivariate Analysis
+
+f1 <- as.formula(paste("Surv(forest_data$OS.time, event = forest_data$OS) ~ ",
+                       paste(c(rownames(res.bisque_filt)), collapse= "+")))
+
+fit.coxph <- coxph(f1, data = forest_data)
+summary(fit.coxph)
+
+ggforest(fit.coxph, data = forest_data, main = "Hazard Ratio Melanoma Metastasis")
+
+```
+
+
+# Barplot
+
+```{r fig.height=10, fig.width=15}
+names(forest_data)
+
+#Filter for columns sample and Stage
+
+data_barplot = forest_data[,c(23,29)]
+
+data_barplot$Mixture <- make.names(data_barplot$Mixture, unique = T)
+data_barplot$Mixture <- gsub("\\.", "-", data_barplot$Mixture)
+
+rownames(data_barplot) = data_barplot$Mixture
+data_barplot$Mixture = NULL
+
+
+data_barplot$Subtype_other[which(is.na(data_barplot$Subtype_other))] <- "nan"
+data_barplot$Subtype_other[which(data_barplot$Subtype_other == "-")] <- "nan"
+
+res_cibersort = forest_data[, c("Mixture", colnames(forest_data)[1:22])]
+res_cibersort$Mixture <- make.names(res_cibersort$Mixture, unique = T)
+res_cibersort$Mixture <- gsub("\\.", "-", res_cibersort$Mixture)
+
+
+#data_barplot$Mixture <- make.names(data_barplot$Mixture, unique = T)
+#data_barplot$Mixture <- gsub("\\.", "-", data_barplot$Mixture)
+
+
+plot.ciber.heat(ciber.obj = res_cibersort, ann_info = data_barplot, sample.column = 1)
+```
+
+
+```{r}
+######## Levels expressions M1 macrophages
+
+
+library(ggplot2)
+library(survival)
+library(survminer)
+
+
+forest_data$Macrophages_M1_group = ifelse(forest_data$Macrophages_M1 >= mean(forest_data$Macrophages_M1), "High", "Low")
+
+fit <- survfit(Surv(OS.time, OS) ~ Macrophages_M1_group, data = forest_data)
+ggsurvplot(fit, palette = c( "#DB7093","#20b2aa"), xlab = "Survival time in years",
+           surv.median.line = c("hv"), cumcensor = F,  conf.int = F ,risk.table = TRUE, pval = T,
+           title = 'Overall survival: TCGA-SKCM (Macrophages M1)', risk.table.y.text.col = T, # colour risk table text annotations.
+           risk.table.y.text = FALSE, font.main = c(10), font.legend = c(10), font.y = c(10),font.x = c(10), font.caption = c(10), 
+           font.tickslab = c(10),legend.labs=c("Macrophages M1 High","Macrophages M1 Low"), fontsize = 3,risk.table.height = 0.3, pval.size = 4, censor.size = 2,
+           font.ytickslab = c(10))
+
+### Correlating mutational profiles with M1 macrophage expression
+
+ggplot(na.omit(forest_data[forest_data$Macrophages_M1 > 0 & !forest_data$Subtype_other == "-",]), aes(x=Subtype_other, y=Macrophages_M1, fill=Subtype_other)) + stat_compare_means(size=3) +
+  geom_boxplot( width=0.5)+  #scale_x_discrete(breaks=c("0","1"),labels=c("MUT","WT"))+
+  labs(x="Mutations status",y="Macrophages M1") + scale_y_continuous(trans='log10') + geom_jitter(shape=16, position=position_jitter(0.2)) + theme_classic2()
+
+# Correlating DNA meth profiles with M1 macrophage expression
+
+ggplot(na.omit(forest_data[forest_data$Macrophages_M1 > 0,]), aes(x=Subtype_DNAmeth, y=Macrophages_M1, fill=Subtype_DNAmeth)) + stat_compare_means(size=3) +
+  geom_boxplot( width=0.5)+  #scale_x_discrete(breaks=c("0","1"),labels=c("MUT","WT"))+
+  labs(x="Mutations status",y="Macrophages M1") + scale_y_continuous(trans='log10') + geom_jitter(shape=16, position=position_jitter(0.2)) + theme_classic2()
+```
+
+```{r}
+# Correlation between lymphocytes and macrophages
+
+corr.cells <-cor(results.sign[1:22])
+#head(round(corr.cells,2))
+
+library(corrplot)
+library(RColorBrewer)
+
+col <- colorRampPalette(c("blue","white","lightpink"))
+
+corrplot(corr.cells[c(4:12),13:16], sig.level = 0.01, 
+         number.cex=0.70, cl.cex = 0.6, 
+         tl.cex = 0.65, tl.col = "black", method="color",addCoef.col = "black", addgrid.col = "black", is.corr=F, mar=c(0,0,1,0))
+
+```
+
+
