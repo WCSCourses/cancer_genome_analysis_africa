@@ -1,0 +1,512 @@
+---
+title: "Selection analyses on normal urothelium"
+output: html_document
+---
+
+##1. Selection on known cancer genes
+
+To study selection at known cancer genes, we combine the coding mutations of all urothelium samples from the 15 transplant organ donors subject to targeted or whole-exome data. To avoid counting multiple times those mutations present in clones spanning multiple biopsies, we conservatively use unique mutations per donor.
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', dev=c('png','pdf'), warning=FALSE, message=FALSE)
+```
+
+####Input files
+
+```{r message=FALSE, warning=FALSE}
+# Input files
+exome_and_tgs_mutations = "bld_exometgs_subsindels_combined.tsv"
+exome_mutations = "bld_exome_caveman_and_pindel_calls.tsv"
+target_genes_file = "normal_baits_genes.txt"
+bladder_cancer_genes_file = "Bladder_cancer_genes_PMID_28988769_29056346.tsv"
+targeted_coverage_file = "bld_targeted_picard_coverage.tsv"
+exome_coverage_file = "bld_exome_picard_coverage.tsv"
+tcgablca_file = "mc3.v0.2.8.PUBLIC.uniqueperdonor.BLCA.6cols.txt"
+patient_file = "bladder_patient_info_2019-10-30.csv"
+lcm_file = "2019-10-01_LCM_database.rds"
+# Loading mutations (substitutions and indels from TGS and WES)
+muts.all = read.table(exome_and_tgs_mutations, sep="\t", header=1, stringsAsFactors=F)
+targetgenes = c(read.table(target_genes_file, header=0, sep="\t", stringsAsFactors=F)[,1], "CDKN2A.p14arf", "CDKN2A.p16INK4a") # Adding the two CDKN2A isoforms
+muts.exome = read.table(exome_mutations, sep="\t", header=1, stringsAsFactors=F)
+# Known bladder cancer genes
+bladder_cancer_genes = read.table(bladder_cancer_genes_file, header=0, sep="\t", stringsAsFactors=F)[,1]
+# Selecting urothelial samples
+patientdata = read.table(patient_file, header=1, sep=",", stringsAsFactors=F)
+lcmdata = readRDS(lcm_file)
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+mutations = muts.all[which(muts.all$sampleID %in% urot_ids),]
+mutations$sampleID = substr(mutations$sampleID,1,7) # Using patient identifiers instead of sample identifiers
+mutations = unique(mutations) # Unique mutations per patient
+```
+
+####Gene-level analysis: dNdScv
+
+We then run dNdScv on all 321 genes in the bait capture. As described in the methods, genes significant by dNdSloc (based on substitutions alone) are excluded from the indel background model of dNdScv. This reduces the inflation of indel rates by reducing the number of positively-selected genes in the background model.
+
+```{r message=FALSE, warning=FALSE}
+library(dndscv)
+library(knitr)
+dndsout = dndscv(mutations, gene_list=targetgenes, max_muts_per_gene_per_sample=Inf, max_coding_muts_per_sample=Inf, outmats=T)
+dndsloc_genes = as.vector(dndsout$sel_loc$gene_name[dndsout$sel_loc$qall_loc<0.05])
+dndsout = dndscv(mutations, gene_list=targetgenes, max_muts_per_gene_per_sample=Inf, max_coding_muts_per_sample=Inf, outmats=T, kc=dndsloc_genes)
+dndsout$sel_cv$qrht = NA
+dndsout$sel_cv$qrht[dndsout$sel_cv$gene_name %in% bladder_cancer_genes] = p.adjust(dndsout$sel_cv$pglobal_cv[dndsout$sel_cv$gene_name %in% bladder_cancer_genes], method="BH")
+# Significant genes
+sel_cv = dndsout$sel_cv[which(dndsout$sel_cv$qmis_cv<0.05 | dndsout$sel_cv$qglobal_cv<0.05 | dndsout$sel_cv$qrht<0.10), c(1:8,10,15:17,19,20)]
+sel_cv$signif = sel_cv$qglobal_cv<0.01 | sel_cv$qmis_cv<0.01
+sel_cv$known = sel_cv$gene_name %in% bladder_cancer_genes
+dndsout_ref = dndsout # We save the main dndsout output object for use in a later section
+drivers = as.vector(sel_cv$gene_name[which(sel_cv$qmis_cv<0.01 | sel_cv$qglobal_cv<0.01 | sel_cv$qrht<0.1)])
+kable(sel_cv[which(sel_cv$signif),], caption="Output of dNdScv", row.names=F)
+```
+
+There are 12 genes that can be considered as clearly significant by dNdScv (qglobal_cv<0.01 or qmis_cv<0.01) (*KDM6A*, *KMT2D*, *ARID1A*, *CDKN1A*, *RBM10*, *STAG2*, *RHOA*, *EP300*, *FOXQ1*, *NOTCH2*, *CREBBP*, *ERCC2*), and 4 additional bladder cancer genes with support from RHT (*KLF5*, *PTEN*, *ZFP36L1* and *ELF3*; qrht<0.10). Together with *GNA13* (described below) we find 17 significant genes in normal urothelium microbiopsies from the 15 transplant organ donors.
+
+We can also use the output of dNdScv to evaluate the global dN/dS ratios from the targeted genes, as shown in Fig 2F.
+
+```{r message=FALSE, warning=FALSE}
+global.dnds = dndsout$globaldnds
+print(global.dnds)
+```
+
+Global dN/dS ratios on the targeted genes can be used to estimate the % of nonsynonymous mutations in the targeted genes that are drivers and the estimated number of driver mutations in these microbiopsies.
+
+```{r message=FALSE, warning=FALSE}
+w = as.matrix(global.dnds[c(1,4),-1]) # Global dN/dS values  wmis and wtrunc values
+f = (w-1)/w # Driver fractions
+n = f*c(sum(dndsout$genemuts$n_mis), sum(dndsout$genemuts$n_non+dndsout$genemuts$n_spl)) # Number of drivers
+print(colSums(n)) # Estimated number of drivers
+```
+
+Alternatively, in PMID: 30337457 we obtained a conservative estimate of the number of driver mutations in normal oesophagus focusing only on genes under significant positive selection. This made possible the inclusion of indels, using non-significant genes in the targeted panel as putative passengers (conservative). Applying this approach to the bladder data yields an estimate of the number of substitution drivers in the 17 driver genes of 235 (CI95%:210,250) (code below, substitutions only -ndriv_subs-), as expected lower than the estimate above considering all 321 targeted genes. Although the confidence intervals are wide, this suggests that there are driver mutations to be discovered in the targeted gene list outside of the 17 significant genes.
+
+Note that conservatively using non-significant genes as approximately neutral background still yields a very high enrichment of indels in the 17 significant genes (wind): obs/exp = 23.5 (CI95%:18.6,29.8). In total, 156 indels were observed in the 17 significant genes, of which ~149.4 are predicted to be drivers (ndriv_inds). Summing substitutions and indels yields an estimated number of driver mutations in the 17 significant genes of: 385 (CI95%:357,401), as described in the main text.
+
+```{r message=FALSE, warning=FALSE}
+# Substitutions: simply running dndscv (to obtain global dN/dS) for the 17 driver genes
+drivers = unique(c(drivers,"GNA13")) # Adding GNA13 from sitednds/codondnds
+dnds2 = dndscv(mutations, gene_list=drivers, max_muts_per_gene_per_sample = Inf, max_coding_muts_per_sample = Inf, outp=1)
+w = as.matrix(dnds2$globaldnds[5,-1])
+n = sum(as.vector(table(dnds2$annotmuts$impact)[c("Missense","Nonsense","Essential_Splice")]))
+ndriv_subs = (w-1)/w*n # This yields 
+# Indels: confidence interval from the ratio of two Poissons
+data("refcds_hg19", package="dndscv")
+RefCDS = RefCDS[sapply(RefCDS, function(x) x$gene_name) %in% targetgenes]
+genelengths = sapply(RefCDS, function(x) x$CDS_length)
+genes = sapply(RefCDS, function(x) x$gene_name)
+nind = table(dndsout$annotmuts[dndsout$annotmuts$mut %in% c("-","INS"),"gene"])[targetgenes]
+nind[is.na(nind)] = 0
+lvec = c(sum(genelengths[genes %in% dndsloc_genes]), sum(genelengths[!(genes %in% dndsloc_genes)]))
+nvec = c(sum(nind[dndsloc_genes]),sum(nind[!(names(nind) %in% dndsloc_genes)]))
+indpois = poisson.test(x=nvec, T=lvec)
+wind = c(indpois$estimate, indpois$conf.int) # Global obs/exp ratio for indels in the 13 genes using all other genes as the background (conservative estimates)
+ndriv_inds = (wind-1)/wind*nvec[1]
+print(ndriv_subs+ndriv_inds) # Conservative calculation of the number of driver mutations with conservative CI95%
+```
+
+####Hotspot-level analysis: sitednds and codondnds
+
+We can use the new sitednds and codondnds functions in the dndscv package to evaluate whether there is evidence of selection at single-site or single-codon level. These methods can be more sensitive than dNdScv to detect oncogenes with infrequent hotspot mutations. 
+
+```{r message=FALSE, warning=FALSE}
+hotspots_geneRHT = sitednds(dndsout, gene_list = targetgenes, method = "LNP")
+data("refcds_hg19", package="dndscv") # Load RefCDS
+RefCDS = RefCDS[sapply(RefCDS, function(x) x$gene_name) %in% targetgenes]
+RefCDSnew = buildcodon(RefCDS) # Adding codon information to RefCDS
+hotcodons_geneRHT = codondnds(dndsout, RefCDSnew, gene_list = targetgenes, method = "LNP")
+# Print output tables
+#kable(hotspots_geneRHT$recursites[hotspots_geneRHT$recursites$qval<0.01,], caption="Output of sitednds (all sites)", row.names=F)
+kable(hotcodons_geneRHT$recurcodons[hotcodons_geneRHT$recurcodons$qval<0.01,], caption="Output of codondnds (all codons)", row.names=F)
+```
+
+Sitednds yields no significant hits. Codondnds finds GNA13:R200 and RHOA:F106 as significantly recurrent codons, with 3 mutations each and qval<0.01. *GNA13* is a little-known bladder cancer gene with a dominant hotspot at the R200 aminoacid. In MC3 calls from TCGA for 411 bladder cancers, there are 12 missense mutations in *GNA13*, of which 7 hit the R200 aminoacid. *GNA13* was reported as a bladder cancer gene by TCGA (Robertson et al., 2017; PMID: 28988769).
+
+*SPOP* does not reach significance in any of these analyses, even though it was close to significance based on qmis_cv when using dNdScv (qmis_cv=0.035). *SPOP* contains 4 missense mutations and they all occur at (or near) known hotspots. Despite their obvious clustering, none of them are recurrent and so escape detection with sitednds or codondnds. *SPOP* has 5 missense mutations in TCGA, of which 3 occur in hotspots (D130 and E47K). Overall, there is suggestive evidence that *SPOP* is an infrequent driver gene both in bladder cancer and in normal bladder urothelium, but it did not reach our stringent significance cutoffs.
+
+##2. Analyses including normal urothelium from the cystectomy samples
+
+We can repeat the main analyses above including apparently normal urothelial samples from the five patients with bladder cancer.
+
+```{r message=FALSE, warning=FALSE}
+# Preparing the table of mutations
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium"])
+mutations = muts.all[which(muts.all$sampleID %in% urot_ids),]
+mutations$sampleID = substr(mutations$sampleID,1,7) # Using patient identifiers instead of sample identifiers
+mutations = unique(mutations) # Unique mutations per patient
+# Gene-wise dN/dS
+dndsout = dndscv(mutations, gene_list=targetgenes, max_muts_per_gene_per_sample=Inf, max_coding_muts_per_sample=Inf, outmats=T, kc=dndsloc_genes)
+dndsout$sel_cv$qrht = NA
+dndsout$sel_cv$qrht[dndsout$sel_cv$gene_name %in% bladder_cancer_genes] = p.adjust(dndsout$sel_cv$pglobal_cv[dndsout$sel_cv$gene_name %in% bladder_cancer_genes], method="BH")
+sel_cv = dndsout$sel_cv[which(dndsout$sel_cv$qmis_cv<0.05 | dndsout$sel_cv$qglobal_cv<0.05 | dndsout$sel_cv$qrht<0.10), c(1:8,10,15:17,19,20)]
+sel_cv$signif = sel_cv$qglobal_cv<0.01 | sel_cv$qmis_cv<0.01 | sel_cv$qrht<0.10
+sel_cv$known = sel_cv$gene_name %in% bladder_cancer_genes
+kable(sel_cv[which(sel_cv$signif),], caption="Output of dNdScv on normal urothelium from all 20 patients", row.names=F)
+```
+
+The addition of the cystectomy samples adds *EEF1A1* to the list of significant genes using qglobal<0.01. Overall, the results are largely similar including or excluding the cystectomy samples.
+
+####Analyses of von Brunn's nests
+
+The analyses above did not include mutations detected in von Brunn's nests. We can run a similar analysis to look for driver mutations in them.
+
+```{r message=FALSE, warning=FALSE}
+# Preparing the table of mutations
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature %in% c("von Brunn's nest")])
+mutations = muts.all[which(muts.all$sampleID %in% urot_ids),]
+mutations$sampleID = substr(mutations$sampleID,1,7) # Using patient identifiers instead of sample identifiers
+mutations = unique(mutations) # Unique mutations per patient
+# Gene-wise dN/dS
+dndsout = dndscv(mutations, gene_list=targetgenes, max_muts_per_gene_per_sample=Inf, max_coding_muts_per_sample=Inf, outmats=T, kc=dndsloc_genes)
+dndsout$sel_cv$qrht = NA
+dndsout$sel_cv$qrht[dndsout$sel_cv$gene_name %in% bladder_cancer_genes] = p.adjust(dndsout$sel_cv$pglobal_cv[dndsout$sel_cv$gene_name %in% bladder_cancer_genes], method="BH")
+sel_cv = dndsout$sel_cv[which(dndsout$sel_cv$qmis_cv<0.05 | dndsout$sel_cv$qglobal_cv<0.05 | dndsout$sel_cv$qrht<0.05), c(1:8,10,15:17,19,20)]
+sel_cv$signif = sel_cv$qglobal_cv<0.01 | sel_cv$qmis_cv<0.01 | sel_cv$qrht<0.10
+sel_cv$known = sel_cv$gene_name %in% bladder_cancer_genes
+kable(sel_cv[which(sel_cv$signif),], caption="Output of dNdScv on von Brunn's nests", row.names=F)
+```
+
+There are only 91 unique coding mutations detected in the gene panel in von Brunn's nests. Despite the very low number of mutations, dNdScv finds some evidence of selection in *ARID1A* (qglobal=0.03), which has 2 indels, 1 nonsense and 1 essential splice site mutations. Beyond this, there is little evidence of selection in von Brunn's nests, although the numbers of mutations are too low to draw firm conclusions.
+
+##3. Whole-exome dNdScv analysis
+
+The availability of 483 whole-exomes from normal urothelium enables us to look into positive and negative selection on non-cancer genes.
+
+```{r message=FALSE, warning=FALSE}
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+mutations = muts.exome[which(muts.exome$sampleID %in% urot_ids),]
+mutations$sampleID = substr(mutations$sampleID,1,7)
+mutations = unique(mutations)
+dndsout = dndscv(mutations, outmats=T) # We could exclude all known bladder cancer genes from the indel background model for simplicity
+sel_cv = dndsout$sel_cv[which(dndsout$sel_cv$qmis_cv<0.05 | dndsout$sel_cv$qglobal_cv<0.05), c(1:8,10,15:17,19)] # When run with indels
+sel_cv$signif = sel_cv$qglobal_cv<0.01 | sel_cv$qmis_cv<0.01 # When run with indels
+data("cancergenes_cgc81", package="dndscv")
+sel_cv$known = sel_cv$gene_name %in% c(bladder_cancer_genes, known_cancergenes)
+dndsout_exome = dndsout # We save the main dndsout output object for use in a later section
+kable(sel_cv[which(sel_cv$signif),], caption="Output of dNdScv on 483 whole exomes", row.names=F)
+```
+
+The whole-exome dNdScv analysis only finds one gene not reported in the analysis of the 321 targeted genes: *KRTAP5-3*. This gene is hit by 4 indels, which upon careful inspection appear to be false positive indel calls.
+
+##4. Driver analysis of TCGA BLCA data
+
+We use the TCGA MC3 public calls, available for 411 bladder cancers (all muscle-invasive). This yields 42 significant genes with the cutoffs used for the normal bladder (without RHT). Applying RHT on the 321 target genes, for comparison with the targeted data, yields a list of 48 significant genes in bladder cancer that overlap with the targeted gene list. The code below also calculates the % of patients with a non-synonymous mutation in each of the significant genes.
+
+```{r message=FALSE, warning=FALSE}
+mutations = read.table(tcgablca_file, header=1, sep="\t", stringsAsFactors=F)[,1:5]
+dndsout = dndscv(mutations, outp=2) # Running only dNdSloc
+dndsloc_genes_tcga = as.vector(dndsout$sel_loc$gene_name[dndsout$sel_loc$qall_loc<0.05])
+dndsout_blca = dndscv(mutations, outmats=T, kc=dndsloc_genes_tcga)
+sel_cv = dndsout_blca$sel_cv[dndsout_blca$sel_cv$gene_name %in% targetgenes, ] # RHT
+sel_cv$qglobal_cv = p.adjust(sel_cv$pglobal_cv, method="BH")
+sel_cv$qmis_cv = p.adjust(sel_cv$pmis_cv, method="BH")
+sel_cv = sel_cv[which(sel_cv$qglobal_cv<0.01 | sel_cv$qmis_cv<0.01), c(1:8,10,15:17,19)]
+sel_cv$patientfreq = sapply(sel_cv$gene_name, function(x) length(unique(dndsout_blca$annotmuts$sampleID[dndsout_blca$annotmuts$gene==x & dndsout_blca$annotmuts$impact!="Synonymous"])) / length(unique(mutations$sampleID)) )
+kable(sel_cv, caption="Output of dNdScv on TCGA BLCA", row.names=F)
+```
+
+##5. Driver barplot (Fig 2A-D)
+
+The figure below shows the list of positively-selected genes, the number of mutations per gene, the dN/dS ratios, the percentage of mutant epithelium (lower bound estimate) and the frequency of these mutations in bladder cancers from TCGA.
+
+```{r fig_driver_barplot, fig.height = 7, fig.width = 4}
+drivers = c("KDM6A","KMT2D","ARID1A","CDKN1A","RBM10","STAG2","RHOA","EP300","FOXQ1","NOTCH2","CREBBP","ERCC2","KLF5","PTEN","ZFP36L1","ELF3","GNA13")
+genes2plot = drivers[order(rowSums(as.matrix(dndsout_ref$sel_cv[dndsout_ref$sel_cv$gene_name %in% drivers, 3:6])), drivers, decreasing=T)] # Sorted by frequency.
+genes2plot = c(genes2plot, c("TP53","PIK3CA","RB1","FGFR3")) # TP53, PIK3CA and RB1.
+
+par(mfrow=c(4,1), mar=c(3,5.5,2,2))
+
+# a. Mutations observed
+nmuts = as.matrix(dndsout_ref$sel_cv[,2:6])
+rownames(nmuts) = dndsout_ref$sel_cv$gene_name
+nmuts = nmuts[genes2plot,]
+subs_per_gene = t(nmuts)
+rownames(subs_per_gene) = c("Synonymous","Missense","Nonsense","Splice","Indels")
+colvec = c("grey70","cadetblue","darkorchid4","darkorchid2","chocolate3")
+pos = barplot(subs_per_gene, las=2, col=colvec, border=NA, ylim=c(0, max(colSums(subs_per_gene))+5), ylab="Total mutations")
+legend("topright",y=max(apply(subs_per_gene,2,sum))*1.09,legend=rownames(subs_per_gene),fill=colvec,border=NA,box.col=NA)
+verticalbar = mean(pos[(0:1)+length(drivers)])
+abline(v=verticalbar)
+
+# b. dN/dS ratios from the dNdScv model
+obsw = as.matrix(dndsout_ref$sel_cv[,c(7,8,10)])
+rownames(obsw) = dndsout_ref$sel_cv$gene_name
+colnames(obsw) = c("Missense","Nonsense+splice","Indels")
+obsw = obsw[genes2plot,]
+#obsp = as.matrix(dndsout_ref$sel_cv[,c(11,12,14)]); rownames(obsp) = dndsout_ref$sel_cv$gene_name; obsp = obsp[genes2plot,]; obsw[obsp>0.05] = NA # Masking out P>0.05
+pos = barplot(t(obsw), beside=T, las=2, col=c("cadetblue","darkorchid3","chocolate3"), border=NA, ylim=c(0,max(obsw,na.rm=T)+10), ylab="dN/dS ratios")
+legend("topright",y=max(apply(obsw,2,sum))*1.09,legend=colnames(obsw),fill=c("cadetblue","darkorchid3","chocolate3"),border=NA,box.col=NA)
+abline(h=1, col="grey")
+abline(v=mean(pos[(0:1)+length(drivers)*3]))
+
+# c. % of mutant urothelium (we will use targeted sequenced samples with median coverage >=50 from transplant donors >=50 years)
+
+min_coverage = 50 # Only considering samples with this minimum coverage
+min_age = 50 # Only donors with this minimum age
+coverage_table1 = read.table(targeted_coverage_file, header=1, sep="\t", stringsAsFactors=F)
+coverage_table2 = read.table(exome_coverage_file, header=1, sep="\t", stringsAsFactors=F)
+enough_cov = unique(c(coverage_table1$SAMPLE_ID[which(coverage_table1$MEDIAN_TARGET_COVERAGE>=min_coverage)],
+               coverage_table2$SAMPLE_ID[which(coverage_table2$MEDIAN_TARGET_COVERAGE>=min_coverage)]))
+
+urot_ids = intersect(enough_cov, as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]]))
+urot_ids = urot_ids[substr(urot_ids,1,7) %in% patientdata$internal_id[patientdata$age>=min_age]]
+num_samples = sum((lcmdata$SentForTargeted=="Y" | lcmdata$SentForExome=="Y") & lcmdata$SupplierSampleName %in% urot_ids)
+
+mutations = dndscv(muts.all[which(muts.all$sampleID %in% urot_ids),1:5], gene_list=targetgenes, max_muts_per_gene_per_sample=Inf, max_coding_muts_per_sample=Inf, outp=1)$annotmuts # Annotating the mutations
+mutations$str = paste(mutations$sampleID, mutations$chr, mutations$pos, mutations$mut, sep=":")
+vafs = setNames(muts.all$vaf, paste(muts.all$sampleID, muts.all$chr, muts.all$pos, muts.all$mut, sep=":"))
+mutations$vaf = vafs[mutations$str]
+
+# Correction for X-chr genes
+xchr_genes = unique(dndsout_ref$annotmuts$gene[dndsout_ref$annotmuts$gene %in% genes2plot & dndsout_ref$annotmuts$chr=="X"])
+male_patients = patientdata$internal_id[patientdata$gender=="Male"]
+
+# Initialising analysis per gene
+fraction_mutant_cells = array(0,dim=c(2,length(genes2plot)))
+colnames(fraction_mutant_cells) = genes2plot
+rownames(fraction_mutant_cells) = c("highbd","lowbd")
+ns = mutations[which(mutations$impact!="Synonymous" & mutations$gene %in% genes2plot),] # Table with all non-synonymous mutations
+
+# Initialising analysis per sample per gene (for the calculation of totals across genes)
+fraction_mutant_cells_persample_low = array(0, dim=c(num_samples,length(genes2plot)))
+s = unique(mutations$sampleID)
+rownames(fraction_mutant_cells_persample_low) = c(s, rep("",num_samples-length(s)))
+colnames(fraction_mutant_cells_persample_low) = genes2plot
+fraction_mutant_cells_persample_high = fraction_mutant_cells_persample_low
+
+for (j in 1:length(genes2plot)) {
+    nsj = ns[ns$gene==genes2plot[j],]
+    nspersample = split(nsj, f=nsj$sampleID)
+    if (nrow(nsj)==0) {
+        fraction_mutant_cells[,j] = 0
+    } else {
+        if (!(genes2plot[j] %in% xchr_genes)) { # Genes in autosomes
+            
+            aux = sapply(nspersample, function(x) c(min(1,sum(x$vaf*2)), min(1,sum(x$vaf))))
+            fraction_mutant_cells[,j] = rowSums(aux) / num_samples
+            fraction_mutant_cells_persample_low[colnames(aux), genes2plot[j]] = aux[2,]
+            fraction_mutant_cells_persample_high[colnames(aux), genes2plot[j]] = aux[1,]
+            
+        } else { # Genes in X-chr (different calculation for male and female patients)
+            f = array(0,dim=c(length(nspersample),2)) # Initialise
+            rownames(f) = names(nspersample)
+            for (p in 1:length(nspersample)) {
+                if (substr(nspersample[[p]]$sampleID[1],1,7) %in% male_patients) { # Male
+                    f[p,] = min(1,sum(nspersample[[p]]$vaf))
+                } else { # Female (standard diploid case)
+                    f[p,] = c(min(1,sum(nspersample[[p]]$vaf*2)), min(1,sum(nspersample[[p]]$vaf)))
+                }
+            }
+            fraction_mutant_cells[,j] = colSums(f) / num_samples
+            fraction_mutant_cells_persample_low[rownames(f), genes2plot[j]] = f[,2]
+            fraction_mutant_cells_persample_high[rownames(f), genes2plot[j]] = f[,1]
+        }
+    }
+}
+aux = rbind(fraction_mutant_cells[2,],fraction_mutant_cells[1,]-fraction_mutant_cells[2,]) * 100
+pos = barplot(aux, las=2, col=c("white","indianred3"), border=NA, ylab="% mutant epithelium", ylim=c(0,6))
+abline(v=verticalbar)
+
+# d. % of TCGA BLCA tumours with a mutation
+blca = read.table(tcgablca_file, header=1, sep="\t", stringsAsFactors=F)
+numsamples = length(unique(blca[,1])) # Number of BLCA samples
+ns = unique(dndsout_blca$annotmuts[dndsout_blca$annotmuts$impact!="Synonymous", c("sampleID","gene")])
+freqs = (table(ns[,2])/numsamples)[genes2plot] * 100 # % of patients with one or more non-synonymous mutation
+freqs[is.na(freqs)] = 0; names(freqs) = genes2plot
+colvec = c("darkorange","grey40") # For significant vs non-significant genes in TCGA
+pos = barplot(freqs, border=NA, las=2, ylim=c(0,50), ylab="% bladder tumours", col=colvec[(names(freqs) %in% bladder_cancer_genes)+1])
+legend(x=8, y=54, legend=c("Known bladder cancer driver","Not known"),fill=c("grey40","darkorange"),border=NA,box.col=NA)
+k = cbind(freqs*length(unique(blca[,1]))/100, length(unique(blca[,1])))
+ci = apply(k, 1, function(x) binom.test(x=x[1],n=x[2])$conf.int) * 100
+blca_freqs = freqs
+blca_ci = ci
+segments(x0=pos, y0=ci[1,], y1=ci[2,], col="grey20")
+abline(v=verticalbar)
+```
+
+In the main text, we also have a statement about the total fraction of cells carrying a driver mutation, aggregated across all driver genes. There are different ways of obtaining this estimate. The most general way is providing a lower bound (assuming that driver mutations in the same biopsy are clonally nested) and a higher bound (assuming that driver mutations in different genes affect different cells of a biopsy). The code below provides this estimate:
+
+```{r}
+est_low = mean(apply(fraction_mutant_cells_persample_low, 1, function(x) max(x))) # Lower bound estimate
+est_high = mean(apply(fraction_mutant_cells_persample_high, 1, function(x) min(1,sum(x)))) # Higher bound estimate
+print(c(est_low,est_high))
+```
+
+####Scatter plot of the relative frequency of drivers in normal urothelium vs TCGA (Fig 2E)
+
+```{r fig_drivers_normalvstcga_scatterplot, fig.height = 5, fig.width = 5}
+selected_genes = setdiff(union(drivers, intersect(bladder_cancer_genes,targetgenes)), "CDKN2A") # Urothelium drivers + BLCA drivers captured by TGS
+
+# Mutation frequencies for relevant genes (absolute counts for normal urothelium and % of mutant cancers for TCGA)
+freq_norm = table(dndsout_ref$annotmuts$gene[dndsout_ref$annotmuts$impact!="Synonymous"])[selected_genes]
+freq_norm[is.na(freq_norm)] = 0
+freq_tcga = table(unique(dndsout_blca$annotmuts[dndsout_blca$annotmuts$gene %in% selected_genes & dndsout_blca$annotmuts$impact!="Synonymous", c("sampleID","gene")])[,2])[selected_genes] / length(unique(dndsout_blca$annotmuts$sampleID)) * 100 # Percentages
+freq_tcga[is.na(freq_tcga)] = 0
+names(freq_norm) = names(freq_tcga) = selected_genes
+selected_genes = union(names(freq_tcga[freq_tcga>0.05]), drivers) # Further restricting the plot to genes mutated in >5% TCGA tumours
+freq_tcga = freq_tcga[selected_genes]
+freq_norm = freq_norm[selected_genes]
+
+# Classifying genes in 3 main pathways (based on two TCGA papers, PMID:24476821 Fig 4 and PMID:28988769 Fig3)
+path1 = c("KAT2A", "KAT2B", "CREBBP", "EP300", "KMT2A", "KMT2D", "KMT2C", "KMT2B", "NSD1", "SETD2", "DOT1L", "KDM5A", "KDM1A", "KDM4A", "KDM6A", "KDM5B", "KDM1B", "KDM4B", "KDM6B", "ARID1B", "ARID1A", "SMARCC2", "SMARCC1", "SMARCA4", "SMARCA2") # Chromatin remodelling
+path2 = c("FGFR3", "EGFR", "ERBB2", "ERBB3", "HRAS", "NRAS", "PIK3CA", "NF1", "PTEN", "STK11", "INPP4B", "TSC1", "TSC2", "RAC1", "FGFR1", "BRAF", "RAF1", "JAK1", "JAK2", "AKT") # RTK/Ras/PIK3K
+path3 = c("ATM", "TP53", "MDM2", "CDKN2A", "CCND1", "CDKN1A", "RB1", "CCNE1", "FBXW7", "E2F3", "CDK4", "CDK6") # p53/Rb pathway
+
+colvec = rep("grey70", length(selected_genes))
+colvec[selected_genes %in% path1] = "chocolate"
+colvec[selected_genes %in% path2] = "cadetblue4"
+colvec[selected_genes %in% path3] = "cadetblue3"
+
+par(pty="s")
+plot(as.numeric(freq_norm), as.numeric(freq_tcga), pch=16, col=colvec, las=1, ylab="% mutation in cancer (TCGA)", xlab="Number non-syn mutations normal bladder", ylim=c(0,50))
+ind = freq_norm>15 | freq_tcga>10
+text(x=as.numeric(freq_norm[ind]), y=as.numeric(freq_tcga[ind])+2, labels=selected_genes[ind], col=colvec[ind], cex=0.8)
+legend(x=30, y=50, legend=c("Chromatin remodelling","RTK/Ras/PI3K pathway","p53/Rb pathway","Other"), pch=15, col=c("chocolate","cadetblue4","cadetblue3","grey70"), box.col = "white")
+```
+
+##6. Variation in the driver landscape across patients (comparison of dN/dS ratios across patients)
+
+A remarkable feature of the bladder data is the extent of variation in the driver landscape across patients. Formally testing differences in selection per gene across patients is not straightforward. Differences in the frequency of driver mutations in a gene can be due to differences in mutation rates or mutation detection sensitivity (e.g. due to coverage, biopsy sizes, etc). dN/dS ratios can help control for some of these differences, but a gene can show significantly different dN/dS ratios in two patients due to large differences in mutation rates and so overall dN/dS ratios in a patient (e.g. higher mutation rates, such as those caused by exposure to mutagens or acquired hypermutation, can lead to lower dN/dS ratios). One method to identify outlier patients with a particular enrichment of driver mutations in a given gene is to compare dN/dS ratios per gene between two datasets (i.e. one patient vs the rest), while correcting for overall dN/dS differences in a set of cancer genes. This can be done with the function below.
+
+####Variation in selection of single genes in specific patients
+
+```{r}
+# Function. Comparing dN/dS values between two datasets using the uniform model and removing global differences in dN/dS between two datasets
+variable_dNdS_twodatasets = function(dnds1, dnds2, genestotest) {
+    
+    library("dndscv")
+    pvec = rmisvec = rtruvec = rep(NA, length(genestotest)) # Initialising vectors for p-values and for the ratios of wmis and wtru between dataset 1 and 2
+    w1 = dnds1$globaldnds$mle; names(w1) = dnds1$globaldnds$name
+    w2 = dnds2$globaldnds$mle; names(w2) = dnds2$globaldnds$name
+    
+    for (g in 1:length(genestotest)) {
+
+        y1 = as.numeric(dnds1$genemuts[dnds1$genemuts$gene==genestotest[g],])
+        y2 = as.numeric(dnds2$genemuts[dnds2$genemuts$gene==genestotest[g],])
+        
+        # Global dN/dS ratios from all other genes (to normalise the differences for the gene being tested)        
+        ind1 = dnds1$genemuts$gene!=genestotest[g]
+        ind2 = dnds2$genemuts$gene!=genestotest[g]
+        wmis1_global = sum(dnds1$genemuts$n_mis[ind1])/sum(dnds1$genemuts$exp_mis[ind1])
+        wmis2_global = sum(dnds2$genemuts$n_mis[ind2])/sum(dnds2$genemuts$exp_mis[ind2])
+        wtru1_global = sum(dnds1$genemuts$n_non[ind1]+dnds1$genemuts$n_spl[ind1])/sum(dnds1$genemuts$exp_non[ind1]+dnds1$genemuts$exp_spl[ind1])
+        wtru2_global = sum(dnds2$genemuts$n_non[ind2]+dnds2$genemuts$n_spl[ind2])/sum(dnds2$genemuts$exp_non[ind2]+dnds2$genemuts$exp_spl[ind2])
+        
+        # MLE dN/dS ratios using the uniform model under H0 and H1
+        wmis_mle0 = (y1[3]+y2[3])/(y1[7]*wmis1_global+y2[7]*wmis2_global)
+        wtru_mle0 = sum(y1[4:5]+y2[4:5])/sum(y1[8:9]*wtru1_global+y2[8:9]*wtru2_global)
+        wmis_mle1 = c(y1[3],y2[3])/c(y1[7]*wmis1_global,y2[7]*wmis2_global)
+        wtru_mle1 = c(sum(y1[4:5]),sum(y2[4:5]))/c(sum(y1[8:9]*wtru1_global),sum(y2[8:9]*wtru2_global))
+        
+        # Observed and predicted counts under H0 and H1
+        obs = as.numeric(c(y1[3], sum(y1[4:5]), y2[3], sum(y2[4:5])))
+        exp0 = as.numeric(c(y1[7]*wmis1_global*wmis_mle0, sum(y1[8:9])*wtru1_global*wtru_mle0, y2[7]*wmis2_global*wmis_mle0, sum(y2[8:9])*wtru2_global*wtru_mle0))
+        exp1 = as.numeric(c(y1[7]*wmis1_global*wmis_mle1[1], sum(y1[8:9])*wtru1_global*wtru_mle1[1], y2[7]*wmis2_global*wmis_mle1[2], sum(y2[8:9])*wtru2_global*wtru_mle1[2])) # Note that exp1 == obs (we only have this line here for confirmation purposes)
+        ll0 = c(sum(dpois(x=obs[c(1,3)], lambda=exp0[c(1,3)], log=T)), sum(dpois(x=obs[c(2,4)], lambda=exp0[c(2,4)], log=T)))
+        ll1 = c(sum(dpois(x=obs[c(1,3)], lambda=exp1[c(1,3)], log=T)), sum(dpois(x=obs[c(2,4)], lambda=exp1[c(2,4)], log=T)))
+        
+        # One-sided p-values
+        pvals = (1-pchisq(2*(ll1-ll0), df=1))
+        if (wmis_mle1[1]<wmis_mle1[2]) { pvals[1] = 1 } else { pvals[1] = pvals[1]/2 }
+        if (wtru_mle1[1]<wtru_mle1[2]) { pvals[2] = 1 } else { pvals[2] = pvals[2]/2 }
+        
+        # Saving the results
+        pvec[g] = 1 - pchisq(-2 * sum(log(pvals)), df = 4) # Fisher combined p-value
+        rmisvec[g] = wmis_mle1[1]/wmis_mle1[2]
+        rtruvec[g] = wtru_mle1[1]/wtru_mle1[2]
+        
+    }
+    out = data.frame(genestotest,pvec,rmisvec,rtruvec)
+    return(out)
+}
+```
+
+Using the "variable_dNdS_twodatasets" function, we can compare the dN/dS ratios per gene (relative to the global dN/dS ratio in driver genes) comparing each patient vs all others.
+
+```{r message=FALSE, warning=FALSE}
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+mutations = muts.all[which(muts.all$sampleID %in% urot_ids),]
+mutations$sampleID = substr(mutations$sampleID,1,7) # Using patient identifiers instead of sample identifiers
+mutations = unique(mutations) # Unique mutations per patient
+pats = unique(mutations$sampleID) # Donor list
+
+nummuts = sort(table(dndsout_ref$annotmuts$gene[dndsout_ref$annotmuts$impact!="Synonymous" & dndsout_ref$annotmuts$gene %in% drivers]), decreasing = T)
+drivers2test = names(nummuts[nummuts>=10]) # Testing only genes with at least 10 non-synonymous mutations in total
+
+pmat_enrich = pmat_deplet = pmat_fisher = rmis = rtru = array(NA, dim=c(length(drivers2test),length(pats)), dimnames=list(drivers2test,pats)) # Initialised arrays
+n_ns1 = n_ns2 = array(NA, dim=c(length(drivers),length(pats)), dimnames=list(drivers,pats)) # Initialised arrays
+
+for (j in 1:length(pats)) {
+    dnds1 = dndscv(mutations[mutations$sampleID==pats[j],], gene_list=targetgenes, max_muts_per_gene_per_sample = Inf, max_coding_muts_per_sample = Inf)
+    dnds2 = dndscv(mutations[mutations$sampleID!=pats[j],], gene_list=targetgenes, max_muts_per_gene_per_sample = Inf, max_coding_muts_per_sample = Inf)
+    out = variable_dNdS_twodatasets(dnds1, dnds2, genestotest=drivers2test)
+    rmis[,j] = out$rmisvec
+    rtru[,j] = out$rtruvec
+    pmat_enrich[,j] = out$pvec
+    n1 = setNames(rowSums(as.matrix(dnds1$sel_cv[,colnames(dnds1$sel_cv) %in% c("n_mis","n_non","n_spl","n_ind")])), dnds1$sel_cv$gene_name) # Including indels
+    n2 = setNames(rowSums(as.matrix(dnds2$sel_cv[,colnames(dnds2$sel_cv) %in% c("n_mis","n_non","n_spl","n_ind")])), dnds2$sel_cv$gene_name) # Including indels
+    n_ns1[,j] = n1[drivers]
+    n_ns2[,j] = n2[drivers]
+}
+
+qmat_enrich = array(p.adjust(pmat_enrich, method="BH"), dim=dim(pmat_enrich), dimnames=dimnames(pmat_enrich))
+ind = which(qmat_enrich<0.05, arr.ind=T)
+signif = data.frame(donor=rownames(qmat_enrich)[ind[,1]], gene=colnames(qmat_enrich)[ind[,2]], qval=qmat_enrich[ind], test="Enriched")
+signif = signif[order(signif$qval),]
+print(signif, row.names=F)
+```
+
+The code below generates the heatmap shown in Fig 2G.
+
+```{r fig_heatmap_drivers_per_donor, fig.height = 4.5, fig.width = 5}
+freq = n_ns1[rowSums(n_ns1)>=10,]
+age = setNames(patientdata$age[patientdata$patient_type=="transplant"], patientdata$internal_id[patientdata$patient_type=="transplant"])[colnames(freq)]
+gender = substr(setNames(patientdata$gender[patientdata$patient_type=="transplant"], patientdata$internal_id[patientdata$patient_type=="transplant"]),1,1)[colnames(freq)]
+freq = freq[rev(order(rowSums(freq),decreasing = T)), order(gender,age)] # Same ordering as the driver barplot
+paper_id = setNames(patientdata$paper_id[patientdata$patient_type=="transplant"], patientdata$internal_id[patientdata$patient_type=="transplant"])[colnames(freq)]
+
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+nsamples = table(substr(unique(muts.all$sampleID[which(muts.all$sampleID %in% urot_ids)]), 1, 7)) # Number of samples sequenced per donor
+nmuts = table(dndsout_ref$annotmuts$sampleID) # Number of unique mutations per donor (restricted to the targeted genes)
+
+column_ids = colnames(freq)
+colnames(freq) = paper_id[colnames(freq)]
+grid = expand.grid(x=rownames(freq), y=colnames(freq))
+grid$z = c(freq)
+
+library(lattice)
+color.palette = colorRampPalette(c("white", "darkorange", "darkorchid2","darkorchid4","grey20"))
+levelplot(z~y*x, grid, col.regions=color.palette, scales = list(tck = c(0,0), y = list(cex=1), x = list(rot=90)), ylab="Genes", xlab="Samples", colorkey=list(space="bottom"), 
+panel=function(...) { arg <- list(...)
+                       panel.levelplot(...)
+                       panel.text(arg$x, arg$y, arg$z)})
+```
+
+Adding information on the number of samples and mutations per donor.
+
+```{r fig_heatmap_drivers_per_donor_part2, fig.height = 2.5, fig.width = 6.5}
+meta = rbind(nsamples[column_ids],nmuts[column_ids])
+colnames(meta) = paper_id
+rownames(meta) = c("samples","mutations")
+grid = expand.grid(x=rownames(meta), y=colnames(meta))
+grid$z = c(meta)
+library(lattice)
+color.palette = colorRampPalette(c("white","grey50"))
+levelplot(z~y*x, grid, col.regions=color.palette, scales = list(tck = c(0,0), y = list(cex=1), x = list(rot=90)), ylab="", xlab="Samples", colorkey=list(space="bottom"), 
+panel=function(...) { arg <- list(...)
+                       panel.levelplot(...)
+                       panel.text(arg$x, arg$y, arg$z)})
+```
+
+In addition to the tests above demonstrating that selection of different genes varies considerably across donors, we can also test whether the overall driver density varies across individuals. The code below uses a simple overdispersion test to determine whether the fraction of mutations annotated as putative drivers vary across donors. A more sophisticated test (also significant) can be performed using dN/dS ratios, accounting for the variation of mutational signatures across donors.
+
+```{r message=FALSE, warning=FALSE}
+num_driv = colSums(freq)
+num_muts = meta[2,]
+betabin_fit = MASS::fitdistr(x = num_driv, emdbook:::dbetabinom, prob = sum(num_driv)/sum(num_muts), size = num_muts, start=list(theta=10), method="L-BFGS-B")
+theta_ml = as.numeric(betabin_fit)[1] # MLE of theta (overdispersion parameter)
+# Calculating the likelihoods
+LL0 = sum(dbinom(x = num_driv, size = num_muts, prob = sum(num_driv)/sum(num_muts), log = T)) # H0: Binomial (no variation across donors)
+LL1 = sum(emdbook:::dbetabinom(x = num_driv, size = num_muts, prob = sum(num_driv)/sum(num_muts), theta = theta_ml, log = T))
+pval = (1-pchisq(2*(LL1-LL0),1)) / 2 # Divided by 2 as it is a 1-sided overdispersion test 
+sprintf("The fraction of coding mutations in target genes annotated as driver mutations varies across donors (P = %0.3g)", pval)
+```
