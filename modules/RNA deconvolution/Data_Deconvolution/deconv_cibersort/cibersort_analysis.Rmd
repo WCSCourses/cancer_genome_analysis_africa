@@ -9,6 +9,7 @@ output:
 
 ```{r}
 #Load libPaths.
+install.packages("ggdendro")
 .libPaths(c("~/deconv_cibersort/deconv_cibersort/lib/","/home/manager/R/x86_64-pc-linux-gnu-library/4.2"))
 #pkgs <- c("survival", "survminer", "data.table", "dplyr", "ggplot2", "e1071", "parallel", "preprocessCore", "corrplot", "RColorBrewer", "parallel", "ggdendro")
 #install.packages(pkgs)
@@ -91,7 +92,7 @@ library(dplyr)
 library(survival)
 library(survminer)
 
-dados_SKCM = readRDS("~/deconv_cibersort/deconv_cibersort/data/Dados_SKCM.rds")
+dados_SKCM = readRDS("data/Dados_SKCM.rds")
 library(readr)
 subtipos <- read_csv("data/subtipos.csv")
 
