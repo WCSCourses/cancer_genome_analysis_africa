@@ -65,7 +65,7 @@ Download here
 
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling: Lecture and Exercises</a>
 
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots>Driver Gene Identification & Oncoplots: Lecture and Exercises</a>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Driver Gene Identification & Oncoplots: Lecture and Exercises</a>
 
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Mutation Signatures: Lecture and Exercises</a>
 
