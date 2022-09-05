@@ -60,12 +60,13 @@ Download here
 
 # Course Manual
 
-**Data Formats & QC
 
-**Mutation Calling
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC: Lecture and Exercises</a>
 
-**Driver Gene Identification & Oncoplots
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling: Lecture and Exercises</a>
 
-**Mutation Signatures
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots>Driver Gene Identification & Oncoplots: Lecture and Exercises</a>
 
-**RNA Decovolution
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Mutation Signatures: Lecture and Exercises</a>
+
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a>
