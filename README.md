@@ -54,19 +54,20 @@ Floris Barthel, Translational Genomics Research Institute (TGen), USA<br>
 Federico Abascal, Sanger Institute, UK<br>
 Shakuntala Baichoo, University of Mauritius, Mauritius<br>
 
-<a href="https://docs.google.com/document/d/1JcSgAb7IkVwW6koWEvwEtyo2DFOTo04P/edit">Timetable</a>
+# Timetable
 
 Download here
 
 # Course Manual
 
-
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC: Lecture and Exercises</a>
-
+Module 1: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC</a>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/Module_1_Lecture_Data_formats.pptx">Lecture</a>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/data_formats_exercises.pdf">Exercises</a>
+Module 2: Driver Gene Identification & Oncoplots
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling: Lecture and Exercises</a>
-
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Driver Gene Identification & Oncoplots: Lecture and Exercises</a>
-
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Mutation Signatures: Lecture and Exercises</a>
-
+Module 3: Driver Gene and Oncoplots
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Lecture and Exercises</a>
+Module 4: Mutation Signatures
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Lecture and Exercises</a>
+Module 5: RNA Decovolution
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a>
