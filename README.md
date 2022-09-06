@@ -54,7 +54,7 @@ Floris Barthel, Translational Genomics Research Institute (TGen), USA<br>
 Federico Abascal, Sanger Institute, UK<br>
 Shakuntala Baichoo, University of Mauritius, Mauritius<br>
 
-# Timetable
+<a href="https://docs.google.com/document/d/1JcSgAb7IkVwW6koWEvwEtyo2DFOTo04P/edit">Timetable</a>
 
 Download here
 
