@@ -63,11 +63,15 @@ Download here
 Module 1: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC</a><br>
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/Module_1_Lecture_Data_formats.pptx">Lecture</a><br>
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/data_formats_exercises.pdf">Exercises</a><br><br>
-Module 2: Driver Gene Identification & Oncoplots
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling: Lecture and Exercises</a>
-Module 3: Driver Gene and Oncoplots
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Lecture and Exercises</a>
-Module 4: Mutation Signatures
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Lecture and Exercises</a>
-Module 5: RNA Decovolution
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a>
+Module 2: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling</a><br>
+<a href="">Lesson</a><br>
+<a href="">Exercises</a><br><br>
+Module 3: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Driver Gene Identification and Oncoplots</a><br>
+<a href="">Lesson</a><br>
+<a href="">Exercises</a><br><br>
+Module 4: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Mutation Signatures</a>
+<a href="">Lesson</a><br>
+<a href="">Exercises</a><br><br>
+Module 5: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a>
+<a href="">Lesson</a><br>
+<a href="">Exercises</a><br><br>
