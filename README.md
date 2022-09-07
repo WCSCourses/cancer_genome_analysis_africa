@@ -73,5 +73,5 @@ Module 4: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/t
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutational%20Signatures/Module_4_Lecture_MutationalSignatures_final.pdf">Lecture</a><br>
 <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutational%20Signatures/SigProfilerExtractor_exercises_final.pdf">Exercises</a><br><br>
 Module 5: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a><br>
-<a href="">Lecture</a><br>
-<a href="">Exercises</a><br><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">Lecture</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">Exercises</a><br><br>
