@@ -56,7 +56,7 @@ Shakuntala Baichoo, University of Mauritius, Mauritius<br>
 
 # Timetable
 
-Download here
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/FINAL%20TIMETABLE_Cancer%20Genome%20Analysis%20Africa%202022%20Virtual%20.pdf">Download here</a>
 
 # Course Manual
 
