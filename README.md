@@ -60,7 +60,7 @@ Download here
 
 # Course Manual
 
-<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Pre-course%20materials">Pre-course Links</a>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Pre-course%20materials/Pre-course%20Links.md">Pre-course Links</a>
 
 
 Module 1: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC</a><br>
