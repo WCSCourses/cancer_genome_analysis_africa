@@ -270,24 +270,123 @@ it should be the same as we generated for alignment.
 ```
 
 
+
+```
+
+## Indexing BAM files
+
+To call variants, we'll need to index our BAM files. We can use the `samtools index`
+command to do so:
+
+```bash
+samtools index chr22.TCRBOA6-Tumor.markdups.bam
+
+samtools index chr22.TCRBOA6-Normal.markdups.bam
+```
+
+Our BAM index is kind of like the index of a book. What do you think its coordinate system is?
+
+```
+
+
+
 ```
 
 
 ## Variant calling
 
+We can now run MuTect2 to call somatic variants in our matched tumor and normal samples.
+Since we're only interested in chromosome 22 (at least for this analysis), we can 
+tell MuTect2 to only call that interval using `-L chr22`. 
+
 ```bash
 gatk Mutect2 \
-    -R ~references/Homo_sapiens_assembly38.fasta \
-    --input tumor.bam \
-    --tumor-sample tumor \
-    --input normal.bam \
-    --normal-sample normal \
-    --output output.vcf
+    -R ~/references/Homo_sapiens_assembly38.fasta \
+    --input chr22.TCRBOA6-Tumor.markdups.bam \
+    --tumor-sample TCRBOA6-Tumor \
+    --input chr22.TCRBOA6-Normal.markdups.bam \
+    --normal-sample chr22.TCRBOA6-Normal \
+    -L chr22 \
+    --output chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf
 ```
+
+Expected runtime: 30-60 minutes
+
 
 We now have a somatic VCF file from MuTect2. But before we start looking for driver mutations or 
 mutational signatures, we should run some basic quality control and assess some of our variants in IGV.
 The following section will give a brief overview of quality control and assessment techniques.
 
+
+
 ## Variant assessment and quality control
 
+There are many ways to do variant quality control. Below, we demonstrate how to use Integrated Genomics Viewer (IGV),
+which is perhaps the most commonly-used program for analyzing variants in BAMs/VCFs.
+
+We also introduce some packages for basic quality control, but we enourage you to focus on _what's_ being plotted
+or analyzed rather than how to do it. Programs change throughout time; focusing on the basic parameters to think about when
+checking your data - depth, quality, filter fields, etc. - will help you build an intuition for how to do quality control regardless
+of what pipeline or software your use.
+
+How many variants are in our VCF file?  
+(Hint: we can use `grep -c "<pattern>" <file>` to count the number of lines that match a pattern in a file.
+If we want the number of lines that _don't_ match a pattern, we can use `grep -c -v "<pattern>" <file>`).
+
+```
+
+
+```
+
+
+## Variant annotation with Funcotator
+
+To make use of our variants, we'll want to annotate them. This process uses databases 
+
+## Manual Review
+
+Manual review of variants is an essential step of the variant calling process. While variant callers use complex statistical
+models and clever heuristics, they still very often make erroneous calls (poor specificity) or miss true variants (poor sensitivity).
+We must filter our variants to generate the most specific, sensitive set of variants we can.
+
+
+We can view our variants using the Unix program `less`. 
+
+```bash
+less -S chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf
+```
+
+The VCF header (lines beginning with `#`) has information about the fields within the file.
+Each variant caller will use its own fields, though there are some common ones across callers
+that are useful for filtering:
+
+- `GT`: Genotype. In tumors, we generally expect true somatic variants to have a `0/1` genotype and a `0/0` genotype in the normal sample.
+- `AD`: Allele Depth. This field provides one value per allele and contains the number of reads supporting that allele. The two AD values will generally add up to the DP value at a given position. AD is a very useful field - we can use it to determine our CCF, 
+tumor purity, and true positive variants.
+- `DP`: Depth. The number of reads covering a given position. We should expect this value to be close to the estimated depth of our sequencing.
+- `QUAL`: the VCF quality field is filled by every caller, though it doesn't have a strict definition. It can't be compared across variant callers and a filter that works for one callset may not work well for another.
+- For mutect2, `F1R2` and `F2R1`: these describe the number of reads in proper versus improper orientation that supports the variant. Too many reads in the improper orientation can indicate that the variant we're examining is unlikely to be real.
+
+
+Let's look at an example line from our VCF (and the last line in our VCF header):
+```
+#CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  TCRBOA6-Normal  TCRBOA6-Tumor
+chr22   10573224        .       C       CT      .       .       AS_SB_TABLE=6,19|3,2;DP=30;ECNT=1;MBQ=35,35;MFRL=546,354;MMQ=40,40;MPOS=38;NALOD=0.997;NLOD=2.66;POPAF=6.00;RPA=2,3;RU=T;STR;TLOD=10.46 GT:AD:AF:DP:F1R2:F2R1:FAD:SB     0/0:9,0:0.092:9:3,0:5,0:9,0:2,7,0,0     0/1:16,5:0.263:21:6,2:10,3:16,5:4,12,3,2
+```
+
+This variant is an indel - specificially, an insertion of a single T after a C at position 10573224 on chromosome 22. In our normal sample, mutect2 called this variant homozygous reference, with nine reads supporting the reference allele. In the tumor,
+mutect2 called the variant heterozygous, with 16 reference-supporting reads and 5 alternate-supporting reads. The Allele Fraction (AF) field in the tumor is 0.263 (5 / (5 + 16)); this is a pretty low allele fraction for a real variant. The variant has a depth of 9 in
+the normal, which is relatively low for this high-depth sequencing. While this variant seems slightly suspicious, there's nothing
+here immediately flags it for removal outside of the low allele fraction.
+
+
+To better assay the variant, let's look at it in IGV. IGV review is performed in nearly every study. There's a lot of nuance
+and intuition used in determining whether a variant is real or not in IGV. As you view many true variants, take note of what
+a real variant looks like and what characteristics are shared among false variants.
+
+
+We can open up IGV, change the genome to human HG38, and load our files for the tumor and normal. Next, we'll use the location
+bar to navigate to the variant we reviewed above. We can then click the coverage bars at the location to open up the detailed
+allele fraction view. The resulting IGV screen will look roughly like the screenshot below:
+
+![](images/igv_3.png)
