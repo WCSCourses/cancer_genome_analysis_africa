@@ -58,6 +58,21 @@ testing and learning other software so long as you follow the data access agreem
 6. `unzip IGV_Linux_2.14.1_WithJava.zip` to uncompress
 7. `sh ~/Downloads/IGV_Linux_2.14.1/igv.sh` to run IGV
 
+# Installing GATK
+
+
+GATK is installed in the course VM, but if you need to install it from scratch:
+```bash
+cd ~
+
+wget https://github.com/broadinstitute/gatk/releases/download/4.2.6.1/gatk-4.2.6.1.zip
+
+unzip gatk-4.2.6.1.zip
+
+## The GATK executable is now in the gatk-4.2.6.1 directory
+```
+
+The GATK is now installed in `~/gatk-4.2.6.1/gatk`.
 
 # Practical
 Below, we ask some concept and knowledge questions before moving on to analyzing a match tumor-normal pair.
@@ -224,7 +239,7 @@ can distort our variant calls downstream if not removed.
 We'll use the Picard MarkDuplicates tool to mark duplicates. Conveniently, this is now integrated into the Genome Analysis Toolkit.
 
 ```bash
-gatk MarkDuplicates \
+~/gatk-4.2.6.1/gatk MarkDuplicates \
     --java-options -Xmx4g \
     -I chr22.TCRBOA6-Normal.bam\
     -O chr22.TCRBOA6-Normal.markdups.bam \
@@ -234,7 +249,7 @@ gatk MarkDuplicates \
 We'll need to do the same for our tumor sample:
 
 ```bash
-gatk MarkDuplicates \
+~/gatk-4.2.6.1/gatk MarkDuplicates \
     --java-options -Xmx4g \
     -I chr22.TCRBOA6-Tumor.bam\
     -O chr22.TCRBOA6-Tumor.markdups.bam \
@@ -271,7 +286,7 @@ The BQSR process will normalize the quality scores within a BAM file based on a 
 (especially indels), resulting in more accurate variant calls downstream.
 
 ```bash
-gatk BaseRecalibrator \
+~/gatk-4.2.6.1/gatk BaseRecalibrator \
     --java-options -Xmx4g \
     --input chr22.TCRBOA6-Normal.markdups.bam \
     --output chr22.TCRBOA6-Normal.markdups.BQSR-REPORT.txt \
@@ -281,7 +296,7 @@ gatk BaseRecalibrator \
 
 
 ```bash
-gatk BaseRecalibrator \
+~/gatk-4.2.6.1/gatk BaseRecalibrator \
     --java-options -Xmx4g \
     --input chr22.TCRBOA6-Tumor.markdups.bam \
     --output chr22.TCRBOA6-Tumor.markdups.BQSR-REPORT.txt \
@@ -331,7 +346,7 @@ Since we're only interested in chromosome 22 (at least for this analysis), we ca
 tell MuTect2 to only call that interval using `-L chr22`. 
 
 ```bash
-gatk Mutect2 \
+~/gatk-4.2.6.1/gatk Mutect2 \
     -R ~/references/Homo_sapiens_assembly38.fasta \
     --input chr22.TCRBOA6-Tumor.markdups.bam \
     --tumor-sample TCRBOA6-Tumor \
@@ -467,7 +482,7 @@ wget https://storage.googleapis.com/broad-public-datasets/funcotator/funcotator_
 tar xvzf funcotator_dataSources.v1.7.20200521s.tar.gz
 
 ## Run Funcotator 
-gatk Funcotator \
+~/gatk-4.2.6.1/gatk Funcotator \
      --variant chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf \
      --reference ~/references/Homo_sapiens_assembly38.fasta \
      --ref-version hg38 \
