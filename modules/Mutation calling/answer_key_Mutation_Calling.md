@@ -102,7 +102,8 @@ $$ 3200 Megabases * \frac{1.5 mutations}{1 megabase} = 4,800 mutations $$
 4. To call somatic variants, we do the following:
 - Call all mutations in the tumor
 - Call all mutations in the normal
-- Subtract out the germline background to generate somatic alls.
+- Subtract out the germline background to generate somatic alls.  
+
 Knowing this, which of the following Venn Diagrams best represents our
 data and the expected number of variants in the germline and somatic VCFs?
 ![](images/somatic_venns.png)
