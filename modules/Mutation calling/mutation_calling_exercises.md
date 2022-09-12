@@ -339,10 +339,6 @@ If we want the number of lines that _don't_ match a pattern, we can use `grep -c
 ```
 
 
-## Variant annotation with Funcotator
-
-To make use of our variants, we'll want to annotate them. This process uses databases 
-
 ## Manual Review
 
 Manual review of variants is an essential step of the variant calling process. While variant callers use complex statistical
@@ -390,3 +386,72 @@ bar to navigate to the variant we reviewed above. We can then click the coverage
 allele fraction view. The resulting IGV screen will look roughly like the screenshot below:
 
 ![](images/igv_3.png)
+
+Looking at this variant in IGV, we can see that there's an insertion at the same location in the normal. For some reason,
+mutect2 doesn't seem to have accounted for this well. There's also only a small number of reads supporting the allele in 
+the tumor, and one read supporting the alt in the normal. Together, this evidence indicates that the variant is a false positive.
+Let's summarize:
+- Low allele depth in tumor. In 30X data, a minimum of AD = 7 or so is a common hard filter.
+- Alt-supporting read in normal. This could be due to tumor-in-normal contamination, but since our normal is a blood sample,
+this is not the case.
+- Low allele fraction. This could be due to low purity, but we know the purity of the tumor is high.
+
+
+Now, let's examine a variant that we expect is real:
+
+![](images/igv_4.png)
+
+
+What are some characteristics of this variant that indicate we should believe it's real?
+
+```
+
+
+
+
+
+
+
+
+```
+
+## Variant annotation with Funcotator
+
+To make use of our variants, we'll want to annotate them. The GATK includes a tool called Funcotator
+that can annotate our VCF with information from databases such as the name of the gene a variant lies in,
+the variant's effect on the protein if any, and whether the variant is present at high allele frequcny in
+any populations. Funcotator can output either VCF or MAF, both of which can be used in downstream tools.
+
+
+Because Funcotator uses data from external databases, it requires very large input files. For this reason 
+we've excluded it from the VM. Below you can find the commands to annotate our somatic VCF:
+
+```bash
+
+## Download the data sources from the Broad public bucket. Note that this file is roughly 30 Gigabytes in size.
+## The 's' after the data (and before .tar) indicates this is the Somatic data source for annotating somatic variants.
+wget https://storage.googleapis.com/broad-public-datasets/funcotator/funcotator_dataSources.v1.7.20200521s.tar.gz
+
+## Untar the data sources so that Funcotator can use them.
+tar xvzf funcotator_dataSources.v1.7.20200521s.tar.gz
+
+## Run Funcotator 
+gatk Funcotator \
+     --variant chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf \
+     --reference ~/references/Homo_sapiens_assembly38.fasta \
+     --ref-version hg38 \
+     --data-sources-path funcotator_dataSources.v1.7.20200521s \
+     --output chr22.TCRBOA6-Tumor.TCRBOA6-Normal.funcotated.maf \
+     --output-file-format MAF
+
+```
+
+Funcotator MAFs have a large header describing the fields. Below, you can find two example variants:
+
+```
+Hugo_Symbol	Entrez_Gene_Id	Center	NCBI_Build	Chromosome	Start_Position	End_Position	Strand	Variant_Classification	Variant_Type	Reference_Allele	Tumor_Seq_Allele1	Tumor_Seq_Allele2	dbSNP_RS	dbSNP_Val_Status	Tumor_Sample_Barcode	Matched_Norm_Sample_Barcode	Match_Norm_Seq_Allele1	Match_Norm_Seq_Allele2	Tumor_Validation_Allele1	Tumor_Validation_Allele2	Match_Norm_Validation_Allele1	Match_Norm_Validation_Allele2	Verification_Status	Validation_Status	Mutation_Status	Sequencing_Phase	Sequence_Source	Validation_Method	Score	BAM_File	Sequencer	Tumor_Sample_UUID	Matched_Norm_Sample_UUID	Genome_Change	Annotation_Transcript	Transcript_Strand	Transcript_Exon	Transcript_Position	cDNA_Change	Codon_Change	Protein_Change	Other_Transcripts	Refseq_mRNA_Id	Refseq_prot_Id	SwissProt_acc_Id	SwissProt_entry_Id	Description	UniProt_AApos	UniProt_Region	UniProt_Site	UniProt_Natural_Variations	UniProt_Experimental_Info	GO_Biological_Process	GO_Cellular_Component	GO_Molecular_Function	COSMIC_overlapping_mutations	COSMIC_fusion_genes	COSMIC_tissue_types_affected	COSMIC_total_alterations_in_gene	Tumorscape_Amplification_Peaks	Tumorscape_Deletion_Peaks	TCGAscape_Amplification_Peaks	TCGAscape_Deletion_Peaks	DrugBank	ref_context	gc_content	CCLE_ONCOMAP_overlapping_mutations	CCLE_ONCOMAP_total_mutations_in_gene	CGC_Mutation_Type	CGC_Translocation_Partner	CGC_Tumor_Types_Somatic	CGC_Tumor_Types_Germline	CGC_Other_Diseases	DNARepairGenes_Activity_linked_to_OMIM	FamilialCancerDatabase_Syndromes	MUTSIG_Published_Results	OREGANNO_ID	OREGANNO_Values	tumor_f	t_alt_count	t_ref_count	n_alt_count	n_ref_count	Gencode_34_secondaryVariantClassification	Achilles_Top_Genes	CGC_Name	CGC_GeneID	CGC_Chr	CGC_Chr_Band	CGC_Cancer_Somatic_Mut	CGC_Cancer_Germline_Mut	CGC_Cancer_Syndrome	CGC_Tissue_Type	CGC_Cancer_Molecular_Genetics	CGC_Other_Germline_Mut	ClinVar_VCF_AF_ESP	ClinVar_VCF_AF_EXAC	ClinVar_VCF_AF_TGP	ClinVar_VCF_ALLELEID	ClinVar_VCF_CLNDISDB	ClinVar_VCF_CLNDISDBINCL	ClinVar_VCF_CLNDN	ClinVar_VCF_CLNDNINCL	ClinVar_VCF_CLNHGVS	ClinVar_VCF_CLNREVSTAT	ClinVar_VCF_CLNSIG	ClinVar_VCF_CLNSIGCONF	ClinVar_VCF_CLNSIGINCL	ClinVar_VCF_CLNVC	ClinVar_VCF_CLNVCSO	ClinVar_VCF_CLNVI	ClinVar_VCF_DBVARID	ClinVar_VCF_GENEINFO	ClinVar_VCF_MC	ClinVar_VCF_ORIGIN	ClinVar_VCF_RS	ClinVar_VCF_SSR	ClinVar_VCF_ID	ClinVar_VCF_FILTER	CosmicFusion_fusion_id	DNARepairGenes_Chromosome_location_linked_to_NCBI_MapView	DNARepairGenes_Accession_number_linked_to_NCBI_Entrez	Familial_Cancer_Genes_Synonym	Familial_Cancer_Genes_Reference	Gencode_XHGNC_hgnc_id	HGNC_HGNC_ID	HGNC_Status	HGNC_Locus_Type	HGNC_Locus_Group	HGNC_Previous_Symbols	HGNC_Previous_Name	HGNC_Synonyms	HGNC_Name_Synonyms	HGNC_Chromosome	HGNC_Date_Modified	HGNC_Date_Symbol_Changed	HGNC_Date_Name_Changed	HGNC_Accession_Numbers	HGNC_Enzyme_IDs	HGNC_Ensembl_Gene_ID	HGNC_Pubmed_IDs	HGNC_RefSeq_IDs	HGNC_Gene_Family_ID	HGNC_Gene_Family_Name	HGNC_CCDS_IDs	HGNC_Vega_ID	HGNC_OMIM_ID(supplied_by_OMIM)	HGNC_RefSeq(supplied_by_NCBI)	HGNC_UniProt_ID(supplied_by_UniProt)	HGNC_Ensembl_ID(supplied_by_Ensembl)	HGNC_UCSC_ID(supplied_by_UCSC)	Oreganno_Build	Simple_Uniprot_alt_uniprot_accessions	dbSNP_ASP	dbSNP_ASS	dbSNP_CAF	dbSNP_CDA	dbSNP_CFL	dbSNP_COMMON	dbSNP_DSS	dbSNP_G5	dbSNP_G5A	dbSNP_GENEINFO	dbSNP_GNO	dbSNP_HD	dbSNP_INT	dbSNP_KGPhase1	dbSNP_KGPhase3	dbSNP_LSD	dbSNP_MTP	dbSNP_MUT	dbSNP_NOC	dbSNP_NOV	dbSNP_NSF	dbSNP_NSM	dbSNP_NSN	dbSNP_OM	dbSNP_OTH	dbSNP_PM	dbSNP_PMC	dbSNP_R3	dbSNP_R5	dbSNP_REF	dbSNP_RV	dbSNP_S3D	dbSNP_SAO	dbSNP_SLO	dbSNP_SSR	dbSNP_SYN	dbSNP_TOPMED	dbSNP_TPA	dbSNP_U3	dbSNP_U5	dbSNP_VC	dbSNP_VP	dbSNP_WGT	dbSNP_WTD	dbSNP_dbSNPBuildID	dbSNP_ID	dbSNP_FILTER	HGNC_Entrez_Gene_ID(supplied_by_NCBI)	dbSNP_RSPOS	dbSNP_VLD	AS_SB_TABLE	AS_UNIQ_ALT_READ_COUNT	CONTQ	DP	ECNT	GERMQ	MBQ	MFRL	MMQ	MPOS	NALOD	NCount	NLOD	OCM	PON	POPAF	ROQ	RPA	RU	SEQQ	STR	STRANDQ	STRQ	TLOD
+Unknown		__UNKNOWN__	hg38	chr22	10573224	10573225	+	IGR	INS	-	-	T	1429893402		__UNKNOWN__	__UNKNOWN__	T	T	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	NA	NA	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	g.chr22:10573224_10573225insT	no_transcript													__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__								__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__		CAAACTGACCTTATTTTTTT	0.3075	__UNKNOWN__	__UNKNOWN__								__UNKNOWN__			0.263	5	16	0	9																																																																							true	false		false	false		false	false	false		false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	false	0	false	0	false	0.99997610856269113,0.00002389143730886	false	false	false	DIV	0x050000000005000002000200	1	false	151	rs1429893402			10573224	false	[6, 19|3, 2]			30	1		[35, 35]	[546, 354]	[40, 40]	38	0.997		2.66			6.00		[2, 3]	T		true			10.46
+CHEK2	11200	__UNKNOWN__	hg38	chr22	28687974	28687974	+	Missense_Mutation	SNP	G	G	C	200432447	byFrequency	__UNKNOWN__	__UNKNOWN__	G	G	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	NA	NA	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	g.chr22:28687974G>C	ENST00000405598.5	-	16	1747	c.1555C>G	c.(1555-1557)Cga>Gga	p.R519G	CHEK2_ENST00000650281.1_Missense_Mutation_p.R519G|CHEK2_ENST00000404276.6_Missense_Mutation_p.R519G|CHEK2_ENST00000382580.6_Missense_Mutation_p.R562G|CHEK2_ENST00000402731.5_Missense_Mutation_p.R490G|CHEK2_ENST00000403642.5_Missense_Mutation_p.R428G|CHEK2_ENST00000649563.1_Missense_Mutation_p.R298G|CHEK2_ENST00000348295.7_Missense_Mutation_p.R490G			O96017	CHK2_HUMAN	checkpoint kinase 2	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	cellular protein catabolic process (GO:0044257)|cellular response to DNA damage stimulus (GO:0006974)|DNA damage checkpoint (GO:0000077)|DNA damage induced protein phosphorylation (GO:0006975)|double-strand break repair (GO:0006302)|G2/M transition of mitotic cell cycle (GO:0000086)|intrinsic apoptotic signaling pathway in response to DNA damage (GO:0008630)|positive regulation of transcription, DNA-templated (GO:0045893)|protein autophosphorylation (GO:0046777)|protein phosphorylation (GO:0006468)|protein stabilization (GO:0050821)|regulation of protein catabolic process (GO:0042176)|regulation of transcription, DNA-templated (GO:0006355)|replicative senescence (GO:0090399)|response to gamma radiation (GO:0010332)|signal transduction in response to DNA damage (GO:0042770)|signal transduction involved in intra-S DNA damage checkpoint (GO:0072428)|spindle assembly involved in mitosis (GO:0090307)|transcription, DNA-templated (GO:0006351)	nucleoplasm (GO:0005654)|PML body (GO:0016605)	ATP binding (GO:0005524)|identical protein binding (GO:0042802)|metal ion binding (GO:0046872)|protein homodimerization activity (GO:0042803)|protein kinase binding (GO:0019901)|protein serine/threonine kinase activity (GO:0004674)|ubiquitin protein ligase binding (GO:0031625)			NS(1)|biliary_tract(27)|breast(269)|central_nervous_system(78)|haematopoietic_and_lymphoid_tissue(148)|kidney(246)|large_intestine(175)|lung(378)|oesophagus(3)|ovary(179)|pancreas(31)|prostate(62)|salivary_gland(174)|skin(44)|soft_tissue(22)|stomach(176)|testis(13)|upper_aerodigestive_tract(121)	2147	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__	__UNKNOWN__		GGCCGCTTTCGACTAGTAGAA	0.4114713216957606	__UNKNOWN__	__UNKNOWN__	F			breast 		Effector kinases CHEK1 , CHEK2		__UNKNOWN__			0.078	3	46	0	23			CHK2 checkpoint homolog (S. pombe)	11200	22	22q12.1		yes	familial breast cancer	E	Rec																											22q12.1	NM_007194			CR456418	HGNC:16627	Approved	gene with protein product	protein-coding gene	RAD53	"CHK2 (checkpoint, S.pombe) homolog", "CHK2 checkpoint homolog (S. pombe)"	CDS1, CHK2, HuCds1, PP1425, bA444G7		22q12.1	2017-03-24	2001-09-27	2011-11-11	AF086904		ENSG00000183765	9836640, 10097108	NM_001005735			CCDS13843, CCDS13844, CCDS33629	OTTHUMG00000151023	604373	NM_001005735	O96017	ENSG00000183765	uc003adu.2		A8K3Y9|B7ZBF3|B7ZBF4|B7ZBF5|Q6QA03|Q6QA04|Q6QA05|Q6QA06|Q6QA07|Q6QA08|Q6QA10|Q6QA11|Q6QA12|Q6QA13|Q9HBS5|Q9HCQ8|Q9UGF0|Q9UGF1	true	false		false	false		false	false	false	CHEK2:11200	false	false	false	false	false	true	false	false	false	false	false	true	true	false	false	true	true	false	false	true	false	true	1	false	0	false	0.99794533639143730,0.00000796381243628,0.00204669979612640	false	false	false	SNV	0x050268000e05040002100100	1	false	137	rs200432447		11200	28687974	true	[26, 43|2, 1]			75	2		[33, 34]	[448, 485]	[60, 40]	39	1.39		6.87			6.00								7.10
+
+```
+
