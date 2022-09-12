@@ -455,3 +455,36 @@ CHEK2	11200	__UNKNOWN__	hg38	chr22	28687974	28687974	+	Missense_Mutation	SNP	G	G
 
 ```
 
+Which of these fields seem important?
+
+```
+
+
+
+```
+
+What gene is the second variant in?
+```
+
+
+
+
+```
+
+What type of variant is the first? And the second?
+
+```
+
+
+
+```
+
+What characteristics of the second variant make it especially important for review and clinical consideration?
+
+```
+
+
+
+
+
+```
