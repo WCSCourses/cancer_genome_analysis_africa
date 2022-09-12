@@ -488,3 +488,36 @@ What characteristics of the second variant make it especially important for revi
 
 
 ```
+
+
+## Alternative: Variant annotation with VEP
+There are many programs for annotating VCF files. Some of the most common ones include the Variant Effect Predictor (VEP), AnnoVar, snpsift, and the GATK Funcotator program we used above. VEP is likely the most commonly used and is a convenient alternative to Funcotator
+because it includes a web interface; however, VEP does not output MAF format. If you want to work with VCF though, you can access
+the VEP Web Interface at the following link:
+
+```
+https://useast.ensembl.org/Homo_sapiens/Tools/VEP
+```
+
+Submitting your data to the form will open a new page with an identifier for your run. It will take several minutes
+to annotate your data; when finished, you can download your annotated VCF file. All of the annotations will be
+in the INFO fields of the VCF - while not pretty, there are tools for manipulating this output into MAF format
+and extracting / filtering this information.
+
+You may also use AnnoVar or snpsift to annotate variants. Because all of these programs need large databases from which
+to draw information, you'll want to run them on machines with plenty of memory and disk space (generally 8+GB of RAM and
+more than 45 GB of free disk space). Since they pull from the same databases, most of them will output the same annotations.
+
+## Assessing variant impact
+How do we assess variant impact? We'll cover this more in the Driver Gene Identification lecture, but here are some quick tips:
+
+- We generally expect mutations within the coding regions of proteins OR in important regulatory regions to be more likely to effect
+the downstream protein than mutations in introns or intergenic regions. Variants that have a HUGO Gene Symbol of "Unknown" or those
+that are labeled as "intronic" are unlikely to have any impact, while those labeled "missense," "stop_gain," or "frameshift" are more
+likely to have a downstream impact.
+- Many programs have been developed to provide scores which quickly indicate the _predicted_ impact of a variant. Some of these
+include CADD, PolyPhen, REVEL, and many, many more. Often it is useful to annotate with these and look for variants that have scores
+that the specific program indicates are likely to be of impact.
+- Because we call variants against a single reference and use databases that are highly biased for samples of European ancestry, we
+may call more variants that differ from the reference in samples from non-European ancestry. This is more likely in germline samples.
+This is another reason it's important to assess a variant's impact by annotation and review.
