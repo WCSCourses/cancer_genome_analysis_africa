@@ -87,7 +87,9 @@ in variant calling, we use statistical methods to locate those variations.
 2. Approximately how many variants do we expect for a given normal sample if we know:  
 - the average genome differs from the reference approximately every 1000bp
 - the human genome is roughly 3.2 Billion basepairs in length?
+
 $$ 3.2 billion basepairs * \frac{1 variant}{1000 basepairs} = 3.2 million expected variants $$
+
 (In general, we can expect to observe roughly 4 Million variants per germline genome, with a significant number being false positives).
 
 3. Let's say our tumor has a mutation burden of 1.5 mutations per _megabase_. Approximately how many mutations does
@@ -370,7 +372,7 @@ If we want the number of lines that _don't_ match a pattern, we can use `grep -c
 grep -cv "#" chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf
 (or: grep -cv "^#" y.chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf, to only count lines starting with '#')
 
-6423
+6423 for new data, 3072 for original Parabricks data
 ```
 
 
@@ -456,7 +458,7 @@ any populations. Funcotator can output either VCF or MAF, both of which can be u
 
 
 Because Funcotator uses data from external databases, it requires very large input files. For this reason 
-we've excluded it from the VM. Below you can find the commands to annotate our somatic VCF:
+we've excluded it from the VM. Below you can find the commands to annotate our somatic VCF; the annotated MAF file is available as part of the course material:
 
 ```bash
 

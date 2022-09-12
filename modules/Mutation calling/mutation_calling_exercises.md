@@ -19,18 +19,29 @@ In this practical, we will:
 
 # Input data
 
-In the VM, we have a directory titled [analysis directory].
+When running the course, we host data inside a VM. However, sometimes this data is out-of-date and instructors
+will provide a link to download the updated material. Please ask the course instructors for access if needed. 
+Any data provided will be provided via HTTP / FTP and can be downloaded with wget like so:
+
+```bash
+wget <file>
+```
+
+
+In the VM, we have a directory titled /home/manager/data/module_2.
 This directory contains data from the [Texas Cancer Research Biobank Open Access project.](http://stegg.hgsc.bcm.edu/open.html).
 We're using whole-genome sequenced data from Case 006, a woman in her 60s who presented with neuroendocrine carcinoma
 of the pancreas and received no prior treatment.
 
+
+What command would you use to see which files are in the directory?
 ```bash
 
 ```
-Files present in the [analysis directory] directory.
+Files in the /home/manager/data/module_2 directory with latest data.
 
 
-The [analysis directory] directory contains the FASTQs, BAMs, and example VCFs for this patient's tumor and normal sample.
+The /home/manager/data/module_2 directory contains the FASTQs, BAMs, and example VCFs for this patient's tumor and normal sample.
 As we go through this tutorial, you'll run the commands to generate each of these files, but you can also skip over long-running
 computational tasks since the data needed is already present. As this is standard whole-genome data, you can also use this for 
 testing and learning other software so long as you follow the data access agreement rules.
@@ -156,7 +167,7 @@ bwa mem \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' \
     ~/references/Homo_sapiens_assembly38.fasta \
-    [analysis directory]/chr22.TCRBOA6-Normal_1.fastq.gz [analysis directory]/chr22.TCRBOA6-Normal_2.fastq.gz \
+    /home/manager/data/module_2/chr22.TCRBOA6-Normal_1.fastq.gz /home/manager/data/module_2/chr22.TCRBOA6-Normal_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Normal.bam -
@@ -197,7 +208,7 @@ bwa mem \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1' \
     ~/references/Homo_sapiens_assembly38.fasta \
-    [analysis directory]/chr22.TCRBOA6-Tumor_1.fastq.gz [analysis directory]/chr22.TCRBOA6-Tumor_2.fastq.gz \
+    /home/manager/data/module_2/chr22.TCRBOA6-Tumor_1.fastq.gz /home/manager/data/module_2/chr22.TCRBOA6-Tumor_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Tumor.bam -
@@ -540,5 +551,3 @@ that the specific program indicates are likely to be of impact.
 - Because we call variants against a single reference and use databases that are highly biased for samples of European ancestry, we
 may call more variants that differ from the reference in samples from non-European ancestry. This is more likely in germline samples.
 This is another reason it's important to assess a variant's impact by annotation and review.
-
-[analysis directory]: "/home/$USER/
