@@ -19,7 +19,7 @@ In this practical, we will:
 
 # Input data
 
-In the VM, we have a directory titled `TODO REPLACE FOLDER PATH`.
+In the VM, we have a directory titled [analysis directory].
 This directory contains data from the [Texas Cancer Research Biobank Open Access project.](http://stegg.hgsc.bcm.edu/open.html).
 We're using whole-genome sequenced data from Case 006, a woman in her 60s who presented with neuroendocrine carcinoma
 of the pancreas and received no prior treatment.
@@ -27,13 +27,26 @@ of the pancreas and received no prior treatment.
 ```bash
 
 ```
-Files present in the `TODO REPLACE FOLDER PATH` directory.
+Files present in the [analysis directory] directory.
 
 
-The `TODO REPLACE FOLDER PATH` directory contains the FASTQs, BAMs, and example VCFs for this patient's tumor and normal sample.
+The [analysis directory] directory contains the FASTQs, BAMs, and example VCFs for this patient's tumor and normal sample.
 As we go through this tutorial, you'll run the commands to generate each of these files, but you can also skip over long-running
 computational tasks since the data needed is already present. As this is standard whole-genome data, you can also use this for 
 testing and learning other software so long as you follow the data access agreement rules.
+
+# Installing IGV
+
+*How to install IGV on your machine*
+1. Open Firefox
+2. Navigate to https://software.broadinstitute.org/software/igv
+3. Navigate to Downloads —> Click IGV for Linux (wait until download completes)
+4. Open Terminal, type:
+
+5. `cd ~/Downloads`
+6. `unzip IGV_Linux_2.14.1_WithJava.zip` to uncompress
+7. `sh ~/Downloads/IGV_Linux_2.14.1/igv.sh` to run IGV
+
 
 # Practical
 Below, we ask some concept and knowledge questions before moving on to analyzing a match tumor-normal pair.
@@ -110,6 +123,9 @@ in the `~/references/` directory and are also downloadable from the [Broad Resou
 ```bash
 bwa index ~/references/Homo_sapiens_assembly38.fasta
 ```
+**Note**: This command will take a very long time to run on the VM, and we've precomputed the indices, so there's no need to run it again.
+Luckily, it only needs to be run once per reference, and can be reused for every new sample.
+Expected runtime: roughly 1.5 hours.
 
 
 Once we have our indices, we are ready to align reads. Remember, we'll use the mem algorithm. The basic input form of BWA is like so:
@@ -125,11 +141,12 @@ bwa mem
 
 We'll also tune the performance of BWA by using the following parameters, such as the number of processing threads and the 
 number of reads we keep in memory at any given time. We'll also pass the `-Y ` flag to enable softclipping on supplementary
-alignments.
+alignments. `-K ` tells BWA how many reads to read in per batch, which affects performance of variant calling and insert size
+calculation. However, the default value is usually fine; on our VM, since we have less RAM, we use a smaller value.
 
 We will also add a Read Group to our data. This step is essential for making our BAM useful in downstream calling - it annotates
 each read with the Read Group so that callers know how to use reads in their statistical models. The Read Group takes the form
-of a string so we must enclose in single quotes.
+of a string so we must enclose in single quotes. The read group is specified with the `-R ` argument.
 
 To align our reads, we run the following command:
 ```bash
@@ -139,7 +156,7 @@ bwa mem \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' \
     ~/references/Homo_sapiens_assembly38.fasta \
-    TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_1.fastq.gz TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Normal_2.fastq.gz \
+    [analysis directory]/chr22.TCRBOA6-Normal_1.fastq.gz [analysis directory]/chr22.TCRBOA6-Normal_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Normal.bam -
@@ -166,6 +183,7 @@ Are there other commands we might use for BAM quality control?
 ```
 
 
+
 ```
 
 
@@ -179,11 +197,12 @@ bwa mem \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1' \
     ~/references/Homo_sapiens_assembly38.fasta \
-    TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Tumor_1.fastq.gz TODO REPLACE FOLDER PATH /chr22.TCRBOA6-Tumor_2.fastq.gz \
+    [analysis directory]/chr22.TCRBOA6-Tumor_1.fastq.gz [analysis directory]/chr22.TCRBOA6-Tumor_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Tumor.bam -
 ```
+Expected runtime: 60-90 minutes.
 
 #### Duplicate Marking
 Once we've aligned our reads we need to perform some additional steps to normalize our data. The first of these is duplicate
@@ -521,3 +540,5 @@ that the specific program indicates are likely to be of impact.
 - Because we call variants against a single reference and use databases that are highly biased for samples of European ancestry, we
 may call more variants that differ from the reference in samples from non-European ancestry. This is more likely in germline samples.
 This is another reason it's important to assess a variant's impact by annotation and review.
+
+[analysis directory]: "/home/$USER/
