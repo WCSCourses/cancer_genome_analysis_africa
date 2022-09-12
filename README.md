@@ -56,16 +56,24 @@ Shakuntala Baichoo, University of Mauritius, Mauritius<br>
 
 # Timetable
 
-Download here
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/FINAL%20TIMETABLE_Cancer%20Genome%20Analysis%20Africa%202022%20Virtual%20.pdf">Download here</a>
 
 # Course Manual
 
-**Data Formats & QC
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Pre-course%20materials/Pre-course%20Links.md">Pre-course Links</a>
 
-**Mutation Calling
 
-**Driver Gene Identification & Oncoplots
-
-**Mutation Signatures
-
-**RNA Decovolution
+Module 1: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Data%20formats%20and%20QC">Data Formats & QC</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/Module_1_Lecture_Data_formats.pptx">Lecture</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Data%20formats%20and%20QC/data_formats_exercises.pdf">Exercises</a><br><br>
+Module 2: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutation%20calling">Mutation Calling</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutation%20calling/Cancer%20Genomics%20Course%20-%20Somatic%20Variant%20Calling.pdf">Lecture</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutation%20calling/mutation_calling_exercises.md">Exercises</a><br><br>
+Module 3: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots">Driver Gene Identification and Oncoplots</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Driver%20gene%20and%20oncoplots/Drivers_in_cancer_vF.pdf">Lecture</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots/Exercises">Exercises</a><br><br>
+Module 4: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Mutational%20Signatures">Mutational Signatures</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutational%20Signatures/Module_4_Lecture_MutationalSignatures_final.pdf">Lecture</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/blob/main/modules/Mutational%20Signatures/SigProfilerExtractor_exercises_final.pdf">Exercises</a><br><br>
+Module 5: <a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution">RNA Decovolution</a><br>
+<a href="https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/RNA%20deconvolution/Data_Deconvolution/deconv_cibersort">Exercises</a><br><br>

@@ -1,0 +1,319 @@
+---
+title: "Driver detection with dndscv"
+author: "Federico Abascal"
+date: "14/09/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Detecting drivers in bladder carcinoma
+
+We will be detecting drivers in the TCGA consortium bladder carcinoma dataset. These data are exomes from 370 donors with bladder cancer.
+
+### Data loading and exploration
+First, we load the data:
+
+
+`muts = read.table("/home/manager/data/Driver_detection_20220823T163817Z-
+001/Driver_detection/TCGA-BLCA.5col",header=T,sep="\t",stringsAsFactors=F)`
+
+```{r, echo=FALSE}
+muts = read.table("~/Documents/Presentaciones/Africa_Cancer_Genomics/Exercises/Driver_detection_datasets/TCGA-BLCA.5col",sep="\t",header=T,stringsAsFactors = F)
+```
+
+It is always a good idea to explore the data first. 
+```{r, echo=TRUE}
+head(muts)
+```
+
+
+To count the number of samples and mutations we can do the following:
+
+```{r echo=TRUE}
+length(unique(muts$sampleID))
+nrow(muts)
+```  
+
+There are `r length(unique(muts$sampleID))` donors and a total of `r nrow(muts)` mutations.
+We can also have a look at the mutation burden across the `r length(unique(muts$sampleID))` donors:
+
+```{r echo=TRUE}
+barplot(sort(table(muts$sampleID)),ylab="Number of mutations",xlab="Donors",las=2,names.arg="")
+```
+
+
+**Are there any hypermutators in the cohort?** This is a relevant question because hypermutators can have a negative impact on the statistical power to detect drivers, and also because some hypermutators (e.g. POLE) are under mutational processes which are not properly modeled by a trinucleotide-substitution model.  
+
+In this exome cohort, the sample with most mutations has `r max(table(muts$sampleID))` mutations. That would extrapolate to approximately `r max(table(muts$sampleID)) * 100 ` mutations in the whole genome. There is not a fixed definition for what a hypermutator is but usually having more than 500 mutations in the exome is considered a hypermutator. We will exclude those samples, but in practice it would be better to explore all possibilities.  
+&nbsp;
+
+
+### dndscv analysis
+Now we will proceed to detect drivers in bladder cancer, searching for genes with evidence of positive selection with `dndscv`.
+
+```{r echo=TRUE, warning=FALSE}
+library(dndscv)
+```
+
+
+#### Gene level signals of selection
+
+We will run `dndscv` removing hypermutators (n>500) and when a given sample has more than 3 mutations in a given gene, `dndscv` will choose three randomly. This is to "protect against loss of sensitivity from ultra-hypermutators and from clustered artefacts in the input mutation table, but there are occasions when the user will prefer to relax these".
+
+```{r echo=TRUE}
+dout = dndscv(muts,max_muts_per_gene_per_sample=3,max_coding_muts_per_sample=500,outmats=T)
+
+```
+
+You will see a warning indicating that some mutations have a wrong reference. This is because of a error in the original TCGA file. We can ignore this as the number of affected bases is very small.
+
+
+These are the outputs within the `dout` list:
+```{r echo=TRUE}
+names(dout)
+```
+
+##### Table of signficant genes
+`dout$sel_cv` contains the results for all the analysed genes. 
+
+We will have a look at those with `qglobal_cv < 0.1`. This is the multiple hypotheses correction q-value for `pglobal_cv`. And `pglobal_cv` is the combined p-value for the different p-values calculated.
+
+```{r echo=TRUE}
+dout$sel_cv[which(dout$sel_cv$qglobal_cv<0.1),]
+```
+
+The table contains 3 types of columns: the data (number of mutations of different types), the coefficients of selection (w), and the associated statistical significance (p and q-values).
+
+
+In total there are `r nrow(dout$sel_cv[which(dout$sel_cv$qglobal_cv<0.1),])` signficant genes.
+
+**Is there any gene under negative selection?**
+
+**Which ones do you think are oncogenes (gain of function) and which tumour suppressors?** Tip: to answer this question you can look at the number of different types of mutations in these genes (`n_syn`, `n_mis`, `n_non`, `n_spl`, `n_ind`)
+
+
+
+Considering the coefficient of selection for missense mutations in *ARID1A*, **how many missense mutations had been selected for in this cohort?** Tip: the coefficient `wmis_cv`is `r dout$sel_cv[which(dout$sel_cv$gene_name=="ARID1A"),"wmis_cv"]` and there are `r dout$sel_cv[which(dout$sel_cv$gene_name=="ARID1A"),"n_mis"]` missense mutations in ARID1A.
+Tip 2: `(w-1)/w` gives the proportion under positive selection.
+Tip 3: 95% confindence intervals for the selection coefficients can be obtained with `geneci(dout,gene_list="ARID1A")`.
+Tip 4: Have a look at `genemuts` to see how many mutations were expected
+
+```{r echo=TRUE}
+dout$genemuts[which(dout$genemuts$gene_name=="ARID1A"),]
+```
+
+
+**Are all those missense mutations under selection?** **Why could this be importance when looking at the mutations in a given tumour?**
+
+Look at the mutations in *PIK3CA*:
+
+```{r echo=FALSE}
+dout$annotmuts[which(dout$annotmuts$gene=="PIK3CA"),]
+```
+
+**How do they distribute in the protein? (`aachange`)** 
+**Is there any recurrent mutation (hotspot) and what does that tell us?**
+Tip: the following code helps summarising the `aachange` information for *PIK3CA*:
+
+```{r echo=FALSE}
+sort(table(dout$annotmuts[which(dout$annotmuts$gene=="PIK3CA"),"aachange"]))
+```
+
+*We will later see how to use the `dndscv` package for hotspot analyses*
+
+
+#### Global signals of selection
+`dndscv` estimates also global dN/dS ratios in the aggregate of all genes.
+This result is also part of the main `dndscv` output:
+
+```{r echo=FALSE}
+dout$globaldnds
+```
+
+
+**Is there evidence of positive selection?**
+
+
+`wspl` is negative. That could mean negative selection but this result is often obtained with exomes data because of the poorer sequencing coverage at splice sites. `dndscv` interprets the depletion of mutations at splice sites as negative selection.
+
+However all the other coefficients are > 1 and their 95% confidence intervals too.
+
+We can use the `globaldnds` information to estimate the number of missense driver mutations per sample.
+
+There are `r length(which(dout$annotmuts$impact=="Missense"))` missense mutations in the cohort, and the coefficient of selection `wmis` is `r dout$globaldnds[1,2]`. 
+
+Calculate the proportion of missense mutations under positive selection using the formula `(w-1)/w`
+
+Find out the actual number of missense mutations under positive selection: `n_mis * (w-1)/w`
+
+Calculate the average per sample: `( n_mis * (w-1)/w ) / num_samples`
+
+
+You can obtain all the info with:
+
+`w = dout$globaldnds[1,2]`
+
+`n_mis = length(which(dout$annotmuts$impact=="Missense"))` 
+
+`num_samples = table(unique(muts$sampleID))`
+
+
+### Analysis of hotspots
+
+We will now look for signals of positive selection at specific DNA or protein sites.
+
+Firstly, have a look at the `annotmuts` output and try to determine by eye if there are hotspots. A couple lines of code which may help with the task:
+
+```{r echo=TRUE}
+dout$annotmuts$gene_and_aachange = paste(dout$annotmuts$gene,dout$annotmuts$aachange,dout$annotmuts$ntchange,dout$annotmuts$pos,dout$annotmuts$impact,sep=":")
+sort(table(dout$annotmuts$gene_and_aachange),decreasing=T)[1:10]
+```
+
+
+Go to the COSMIC database to gather further information about these hotspots. For example:
+
+*FGFR3* https://cancer.sanger.ac.uk/cosmic/gene/analysis?ln=FGFR3
+
+Look at other hotspots, the domain structure, the 3D structure
+
+The Hallmarks of Cancer has also valuable information on drivers:
+https://cancer.sanger.ac.uk/cosmic/census-page/FGFR3 
+
+
+**Do you think hotspots are more frequent in oncogenes or in tumour suppressors?**
+
+
+#### Using sitednds and codondnds
+
+`sitednds` looks for selection (mutation recurrence over random expectations) at specific DNA positions, while `codondnds` looks for selection at codons. Each method may be more sensitive for different kinds of hotspots, hence we recommend trying both.
+
+##### Running sitednds
+
+To reduce the risk of false positives and increase the signal to noise ratio, we will only consider mutations in Cancer Gene Census genes (v81).
+
+```{r message=FALSE, warning=FALSE}
+library("dndscv")
+data("cancergenes_cgc81", package="dndscv") # Loading the genes in the Cancer Gene Census (v81)
+dout_cancergenes = dndscv(muts, outmats=T, gene_list=known_cancergenes)
+```
+
+The *sitednds* function takes the output of *dndscv* as input. In order for the dndsout object to be compatible with *sitednds*, users must use the "outmats=T" argument in *dndscv*. 
+
+
+```{r echo=TRUE}
+sout = sitednds(dout_cancergenes)
+```
+
+The output list contains the following objects:
+
+```{r echo=TRUE}
+names(sout)
+```
+
+We are mainly interested in `recursites`.
+
+These are the significant sites:
+
+```{r echo=TRUE}
+sout$recursites[which(sout$recursites$qval<0.1),]
+```
+
+##### Running codondnds
+
+We will not run it because it requires creating a new database, which can take about 20', but this is how you can do it.
+
+<pre>
+data("refcds_hg19", package = "dndscv")
+RefCDS_codon = buildcodon(RefCDS)
+codon_dnds = codondnds(dout_cancergenes, RefCDS_codon, theta_option="conservative", min_recurr=2)
+codon_dnds$recurcodons[which(codon_dnds$recurcodons$qval<0.1),]
+</pre>
+
+The output should look something like this:
+
+`codon_dnds$recurcodons[which(codon_dnds$recurcodons$qval<0.1),]`
+
+<pre>
+   chr          gene codon freq           mu      dnds         pval         qval
+1    4         FGFR3  S249   13 0.0026714453 4866.2797 2.621846e-25 1.376535e-19
+2   17          TP53  R248   16 0.0099400778 1609.6453 7.833417e-22 2.056370e-16
+3    3        PIK3CA  E545   12 0.0081868351 1465.7679 7.394593e-18 1.294115e-12
+4   12          KRAS   G12    6 0.0014473316 4145.5601 2.651640e-14 3.480443e-09
+5   17         ERBB2  S310    7 0.0032911176 2126.9371 6.485301e-14 6.809891e-09
+6    3        PIK3CA  E542    8 0.0081206853  985.1385 1.365277e-12 1.194674e-07
+7    4         FGFR3  Y375    5 0.0013764724 3632.4740 2.521340e-12 1.891095e-07
+8   17          TP53  R280    8 0.0118571608  674.6978 2.381470e-11 1.562914e-06
+9   19         ERCC2  N238    4 0.0011025375 3627.9944 1.384008e-10 8.073762e-06
+10  17          TP53  E285    7 0.0124847138  560.6857 5.092478e-10 2.673678e-05
+11   4         FBXW7  R505    4 0.0042853070  933.4220 2.947422e-08 1.406791e-03
+12   2         SF3B1  E902    4 0.0050917631  785.5825 5.773892e-08 2.526198e-03
+13  17          TP53  A159    4 0.0054963967  727.7495 7.772309e-08 3.138967e-03
+14  12         ERBB3  V104    3 0.0042258838  709.9107 1.292705e-06 4.847876e-02
+15   9 CDKN2A.p14arf   A97    2 0.0008437944 2370.2457 2.705783e-06 9.470692e-02
+
+</pre>
+
+
+## Predicting drivers in a given donor using the Cancer Genome Interpreter
+
+We will use the Cancer Genome Interpreter to predict drivers in one of our donors.
+
+To make it more interesting, each one can select one donor randomly:
+
+
+```{r echo=TRUE}
+random_donor = sample(unique(muts$sampleID),1)
+muts_in_random_donor = muts[which(muts$sampleID == random_donor),c("chr","pos","ref","mut")]
+cat(random_donor, " donor has ",nrow(muts_in_random_donor), " mutations\n",sep="")
+write.table(muts_in_random_donor, file=paste(random_donor,".tsv",sep=""),col.names=F,row.names=F,quote=F)
+
+```
+
+Copy those mutations and paste them here: https://www.cancergenomeinterpreter.org/analysis 
+
+Select hg19 as "Reference genome" and click "Run". The analysis will take a few minutes.
+
+You can also explore bladder cancer at **Intogen**: https://www.intogen.org/search
+There you would find 78 drivers defined for bladder cancer
+
+<!---write.table(dout$annotmuts[which(dout$annotmuts$gene=="ARID1A"&dout$annotmuts$impact=="Missense"),c("chr","pos","ref","mut")],file="ARID1A.missense.tsv",row.names=F,col.names=FALSE,quote=F)--->
+
+
+### Further tutorials and exercises
+
+If you have finished or want to explore more on using dndscv, take a look at these tutorials. They are available at https://github.com/WCSCourses/cancer_genome_analysis_africa/tree/main/modules/Driver%20gene%20and%20oncoplots 
+
+* Drivers in healthy bladder (Lawson et al, *Science* 2020; PMID: 33004514). Interesting to compare the driver landscape in cancer and healthy tissues and to explore the heterogeneity across different donors. The code includes plotting functions.
+
+* 2020, Romania course: Selection in oesophageal cancer, selection in de novo mutations, selection in germline variation.
+
+Questions are welcome (fa8@sanger.ac.uk).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

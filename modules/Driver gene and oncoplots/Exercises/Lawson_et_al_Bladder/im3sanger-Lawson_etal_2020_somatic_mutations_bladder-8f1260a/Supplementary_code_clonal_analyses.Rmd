@@ -1,0 +1,418 @@
+---
+title: "Clonal analyses on normal urothelium"
+output: html_document
+---
+    
+##1. Clone lengths
+    
+To study selection at known cancer genes, we combine the coding mutations of all urothelium samples from the 15 transplant organ donors subject to targeted or whole-exome data. To avoid counting multiple times those mutations present in clones spanning multiple biopsies, we conservatively use unique mutations per donor.
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', dev=c('png','pdf'), warning=FALSE, message=FALSE, useDingbats=F)
+```
+
+####Input files
+
+```{r message=FALSE, warning=FALSE}
+# Input files
+exome_and_tgs_mutations = "bld_exometgs_subsindels_combined.tsv"
+exome_mutations = "bld_exome_caveman_and_pindel_calls.tsv"
+target_genes_file = "normal_baits_genes.txt"
+bladder_cancer_genes_file = "Bladder_cancer_genes_PMID_28988769_29056346.tsv"
+targeted_coverage_file = "bld_targeted_picard_coverage.tsv"
+exome_coverage_file = "bld_exome_picard_coverage.tsv"
+tcgablca_file = "mc3.v0.2.8.PUBLIC.uniqueperdonor.BLCA.6cols.txt"
+patient_file = "bladder_patient_info_2019-10-30.csv"
+lcm_file = "2019-10-01_LCM_database.rds"
+# Loading mutations (substitutions and indels from TGS and WES)
+muts.all = read.table(exome_and_tgs_mutations, sep="\t", header=1, stringsAsFactors=F)
+targetgenes = c(read.table(target_genes_file, header=0, sep="\t", stringsAsFactors=F)[,1], "CDKN2A.p14arf", "CDKN2A.p16INK4a") # Adding the two CDKN2A isoforms
+muts.exome = read.table(exome_mutations, sep="\t", header=1, stringsAsFactors=F)
+# Selecting urothelial samples
+patientdata = read.table(patient_file, header=1, sep=",", stringsAsFactors=F)
+gender = setNames(patientdata$gender, patientdata$internal_id)
+lcmdata = readRDS(lcm_file)
+urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+muts.all = muts.all[which(muts.all$sampleID %in% urot_ids),]
+```
+
+We can annotate the functional impact of coding mutations using dNdScv.
+
+```{r message=FALSE, warning=FALSE}
+library(dndscv)
+dndsout = dndscv(muts.all, gene_list = targetgenes, outp = 1, max_muts_per_gene_per_sample = Inf, max_coding_muts_per_sample = Inf)
+muts.all.annot = merge(muts.all, dndsout$annotmuts, all.y = T)
+muts.all.annot = muts.all.annot[order(muts.all.annot$sampleID, muts.all.annot$chr, muts.all.annot$pos), ]
+
+# Evaluating cases in which more than 1 indels was detected in the same gene in the same sample, most are genuine, but some reflect double counting from TGS/WXS
+# Also, some substitutions appear to occur near indels. To be conservative, we collapse multiple mutations when closer than 20bp.
+aux = muts.all.annot$sampleID[1:(nrow(muts.all.annot)-1)]==muts.all.annot$sampleID[2:nrow(muts.all.annot)] &
+    muts.all.annot$chr[1:(nrow(muts.all.annot)-1)]==muts.all.annot$chr[2:nrow(muts.all.annot)] &
+    (muts.all.annot$pos[1:(nrow(muts.all.annot)-1)]+20) >= muts.all.annot$pos[2:nrow(muts.all.annot)]
+clusters = rle(aux)
+clust_end = cumsum(clusters$lengths)[clusters$values==T] + 1
+clust_start = clust_end - clusters$lengths[clusters$values==T]
+rmrows = rep(0,nrow(muts.all.annot))
+for (j in 1:length(clust_start)) { # For each cluster we chose 1 mutations based on 2 rules: (1) Indel take precedence over substitutions, (2) Higher VAF.
+    ind = clust_start[j]:clust_end[j]
+    chosen = which.max(muts.all.annot$vaf[ind] + !(muts.all.annot$mut[ind] %in% c("A","C","G","T")))
+    rmrows[ind[-chosen]] = 1
+}
+muts.all.annot = muts.all.annot[!rmrows, ]
+```
+
+####Estimation of clone lengths (Fig 1C)
+
+The use of laser microdissection poses a challenge for estimating clone sizes, as histology sections only provide ~1-dimensional cuts across a clone. Rather than estimating the areas of clones in 2-dimensions in the epithelium, we can use the length of the microbiopsies and the allele frequencies of the mutations to estimate the "length" of mutant clones from 1D strips of epithelium. As a first approximation to mutant clone sizes, we can make a series of simplifying assumptions: (1) mutant cell fraction (MCF) estimated as 2*VAF (i.e. assuming diploid copy number and heterozygous mutations), and (2) in the absence of knowledge about the shapes of mutant clones, we assume that they are compact, which will yield lower-bound estimates of clone lengths. To account for mutations extending beyond a single biopsy, we group instances of the same mutation when they are seen in the same individual and in the same section (combining the slideID and the sectionNo).
+
+Note: If clones were circular in 2D, random 1D cuts across them would give clone lengths that follow the distribution of the chord length distribution of a circle. The relationship between the mean chord length (d) and the radius of a circle (R) is: R = pi x d / 4 ~ 0.79d (diameter D ~ 1.57d). These relationships can be obtained by integrating for all angles the equation for the chord length of a circle.
+
+```{r fig_hist_clone_lengths, fig.height = 4, fig.width = 5}
+# Grouping mutations occurring in the same section
+lcmdata$SlideID_SectionNo = paste(lcmdata$SlideID, lcmdata$SectionNo, sep=":")
+muts.all.annot$sectionID = setNames(lcmdata$SlideID_SectionNo, lcmdata$SupplierSampleName)[muts.all.annot$sampleID]
+muts.all.annot$feature = setNames(lcmdata$Feature, lcmdata$SupplierSampleName)[muts.all.annot$sampleID]
+muts.all.annot$cutlength = setNames(lcmdata$SlideScannerLengthSimplified, lcmdata$SupplierSampleName)[muts.all.annot$sampleID]
+aux = muts.all.annot[!is.na(muts.all.annot$cutlength), ]
+aux = aux[aux$feature=="Urothelium", ]
+aux$clonelength = aux$cutlength * aux$vaf * 2 # Clone length estimation
+ind_xmales = aux$chr %in% c("X","Y") & substr(aux$sampleID,1,7) %in% names(gender[gender=="Male"]) # Mutations in male X or Y chromosomes.
+aux$clonelength[ind_xmales] = aux$cutlength[ind_xmales] * aux$vaf[ind_xmales] # Clone length estimation for single copy chrs
+# Merging clones within a section
+split_muts2 = split(aux, f = paste(aux$chr,aux$pos,aux$mut,aux$sectionID,sep=":")) # Mutations per histological section
+print(table(sapply(split_muts2, nrow))) # This shows that most mutations are constrained to a single microbiopsy
+clone_lengths = sapply(split_muts2, function(x) sum(x$clonelength))
+hist(pmin(2000,clone_lengths), 100, las=1, xlab="Clone lengths (um)", col="cadetblue", border=NA, main="")
+abline(v=median(aux$cutlength), lty=2)
+```
+
+The analysis above suggests that the majority of clones are constrained within a single microbiopsy in each histology section and that most clones appear smaller (estimated *length*) than 500um.
+
+####Clone lengths of drivers vs passenger mutations
+
+We can evaluate the estimated clone length or the VAF of coding mutations classified as likely drivers or passengers. Passenger mutations can, in theory, reach high allele frequencies by drift or by hitchhiking with a driver mutation. In the analysis below, we annotate putative drivers and passengers, avoiding annotating passenger mutations in samples with a putative driver mutation to minimise the impact of hitchhiking. This simplistic and imperfect analysis suggests that driver mutations in several of the significant driver genes seem to be associated with larger clone sizes, as expected for drivers of clonal expansions. However, caution should be exercised interpreting these results as some clones were detected in multiple microbiopsies, the annotation of drivers and passengers is imperfect and the statistical power to detect an effect is modest in genes with few mutations.
+
+```{r fig_clone_lengths_driv_pass, fig.height = 5, fig.width = 5}
+drivers = c("KDM6A","KMT2D","ARID1A","CDKN1A","RBM10","STAG2","RHOA","EP300","FOXQ1","NOTCH2","CREBBP","ERCC2","KLF5","PTEN","ZFP36L1","ELF3","GNA13")
+
+# Using unique mutations per sectionID and avoiding duplicates caused by sampling z-stacks (we take the largest estimated clone length for each mutation per patient)
+split_muts3 = split_muts2
+for (j in 1:length(split_muts3)) {
+    if (nrow(split_muts3[[j]])>1) { 
+        split_muts3[[j]]$clonelength = sum(split_muts3[[j]]$clonelength) # Summing clone length within a histology section
+        split_muts3[[j]] = split_muts3[[j]][1,]
+    }
+}
+aux = do.call(rbind.data.frame, split_muts3)
+split_muts4 = split(aux, f=paste(substr(aux$sampleID,1,7),aux$chr,aux$pos,aux$mut))
+for (j in 1:length(split_muts4)) {
+    if (nrow(split_muts4[[j]])>1) { 
+        split_muts4[[j]] = split_muts4[[j]][which.max(split_muts4[[j]]$clonelength),] # Selecting the largest estimated clone for each instance of a mutation in an individual
+    }
+}
+aux = do.call(rbind.data.frame, split_muts4)
+
+# Permutation test (one-sided)
+set.seed(123)
+p.test = function(x, y, n=100000) {
+    # Permutation test
+    st = mean(y)/mean(x)
+    stvec = rep(NA,n)
+    for (j in 1:n) { s = sample(c(x,y)); stvec[j] = mean(s[1:length(y)])/mean(s[(length(y)+1):length(s)]) }
+    p = (sum(stvec>=st)+1)/(n+1)
+    # Bootstrap estimation of the CI95% of the mean of y
+    boot.samples = matrix(sample(y, size = length(y) * n, replace = TRUE), n, length(y))
+    boot.statistics = apply(boot.samples, 1, mean)
+    return(list(p.value=p, mean=mean(y), ci=quantile(boot.statistics, c(0.025,0.975))))
+}
+
+# Driver and passenger annotation 
+muts.driv = aux[which(aux$impact!="Synonymous" & aux$gene %in% drivers), ] # Putative drivers (liberal approach)
+muts.pass = aux[which(!(aux$sampleID %in% unique(muts.driv$sampleID))), ] # Excluding samples with a putative driver
+#muts.pass = aux[which(aux$impact=="Synonymous"), ] # Without excluding samples with a putative driver
+out = data.frame(gene=c("Passengers","Drivers",drivers), pdriv=NA, qdriv=NA, mean=NA, ci1=NA, ci2=NA)
+
+# Permutation tests
+ptestout = p.test(muts.pass$clonelength, muts.pass$clonelength)
+out$mean[1] = ptestout$mean
+out[1,5:6] = ptestout$ci
+ptestout = p.test(muts.pass$clonelength, muts.driv$clonelength)
+out$pdriv[2] = ptestout$p.value
+out$mean[2] = ptestout$mean
+out[2,5:6] = ptestout$ci
+for (j in 1:length(drivers)) {
+    ptestout = p.test(muts.pass$clonelength, muts.driv$clonelength[muts.driv$gene==drivers[j]])
+    out$pdriv[j+2] = ptestout$p.value
+    out$mean[j+2] = ptestout$mean
+    out[j+2,5:6] = ptestout$ci
+}
+out$qdriv = p.adjust(out$pdriv, method="BH")
+out2 = out[which(is.na(out$qdriv) | out$qdriv<0.1), ] # Significant hits
+qdriv = setNames(out2$qdriv, out2$gene)[-1]
+ind = setNames(2:(length(qdriv)+1), names(qdriv))
+y = c(muts.pass$clonelength, muts.driv$clonelength, muts.driv$clonelength[muts.driv$gene %in% names(qdriv)]) # Clone lengths
+x = c(rep(1,length(muts.pass$clonelength)),
+      rep(2,length(muts.driv$clonelength)),
+      ind[muts.driv$gene[muts.driv$gene %in% names(qdriv)]])
+
+# Plot
+#dev.new(width=5, height=5)
+plot(jitter(x), y, pch=16, cex=0.6, col="grey70", las=2, xaxt="n", xlab="", ylab="Estimated clone lengths (um)")
+axis(1, at=1:max(x), labels=c("Passengers","All drivers",names(qdriv)[-1]), las=2)
+abline(h=out2$mean[1], lty=2, col="grey30")
+segments(x0=seq(max(x)), y0=out2$ci1, y1=out2$ci2, lwd=1.5)
+segments(x0=seq(max(x))-0.3, x1=seq(max(x))+0.3, y0=out2$mean, lwd=3, col="cadetblue")
+text(x=(2:max(x))+0.3, y=1500, labels = sprintf("q=%0.2g",qdriv), srt=60)
+dev.copy(pdf, "Fig_clone_lengths_driv_pass.pdf", width=5, height=5, useDingbats=F); dev.off(); dev.off()
+```
+
+##2. Clonal decomposition (Fig 4E-G)
+
+Urothelium biopsies are typically oligoclonal, lymphocyte aggregates appear generally polyclonal and von Brunn's nests are largely clonal. To study the clonality of mutations in different samples we fitted a beta-binomial mixture model to the mutations in each sample. The histograms below reproduce Figs 4E-G.
+
+```{r fig_Fig4EG, fig.height = 7, fig.width = 3.5}
+source("vafclusters_mixbbin.R") # Loading the beta-binomial mixture model function into R
+
+# Annotating the feature for each sample in muts.all
+lcmdata = readRDS(lcm_file)
+lcmdata$SlideID_SectionNo = paste(lcmdata$SlideID, lcmdata$SectionNo, sep=":")
+muts.all = read.table(exome_and_tgs_mutations, sep="\t", header=1, stringsAsFactors=F)
+muts.all$sectionID = setNames(lcmdata$SlideID_SectionNo, lcmdata$SupplierSampleName)[muts.all$sampleID]
+muts.all$feature = setNames(lcmdata$Feature, lcmdata$SupplierSampleName)[muts.all$sampleID]
+min_coverage = 50 # Only mutations with a minimum coverage will be used
+valid_features = c("Urothelium","von Brunn's nest","Lymphocyte Cluster")
+
+m2 = muts.all[which(muts.all$chr %in% c(1:21,"22") & muts.all$feature %in% valid_features & !is.na(muts.all$mut_dep/muts.all$all_dep) & muts.all$ref %in% c("A","C","G","T") & muts.all$mut %in% c("A","C","G","T") & muts.all$all_dep>=min_coverage), ]
+maux = split(m2,f=m2$sampleID)
+
+bigclone = data.frame(sampleID=names(maux), bigclone=NA, feature=NA, stringsAsFactors=F)
+for (j in 1:length(maux)) {
+    mm = as.matrix(maux[[j]][,c("mut_dep","all_dep")]) # mismatch count table
+    clusters = vafclusters_mixbbin(mm, num_runs=50, bb_rho=1e-4)
+    bigclone$bigclone[j] = max(clusters$m_est)
+    bigclone$feature[j] = as.vector(unique(maux[[j]]$feature))
+    #if (round(j/100)==(j/100)) { print(j/length(maux)) } # Print progress
+}
+bigclone$exome = bigclone$sampleID %in% unique(muts.exome$sampleID) # Annotating whether the sample has exome data
+
+# Histogram of the position of the largest subclone
+par(mfrow=c(3,1))
+hist(bigclone$bigclone[bigclone$feature==valid_features[1]], seq(0,1,length.out=35), col="grey70", border=NA, main=valid_features[1], las=1, xlab="VAF", ylab="Number samples")
+hist(bigclone$bigclone[bigclone$feature==valid_features[1] & bigclone$exome], seq(0,1,length.out=35), col="cadetblue", border=NA, main=valid_features[1], las=1, xlab="VAF", ylab="Number samples", add=T)
+hist(bigclone$bigclone[bigclone$feature==valid_features[2]], seq(0,1,length.out=35), col="grey70", border=NA, main=valid_features[2], las=1, xlab="VAF", ylab="Number samples")
+hist(bigclone$bigclone[bigclone$feature==valid_features[2] & bigclone$exome], seq(0,1,length.out=35), col="cadetblue", border=NA, main=valid_features[1], las=1, xlab="VAF", ylab="Number samples", add=T)
+hist(bigclone$bigclone[bigclone$feature==valid_features[3]], seq(0,1,length.out=35), col="grey70", border=NA, main=valid_features[3], las=1, xlab="VAF", ylab="Number samples")
+hist(bigclone$bigclone[bigclone$feature==valid_features[3] & bigclone$exome], seq(0,1,length.out=35), col="cadetblue", border=NA, main=valid_features[1], las=1, xlab="VAF", ylab="Number samples", add=T)
+hist(bigclone$bigclone[bigclone$feature==valid_features[3] & substr(bigclone$sampleID,1,7)=="PD40843"], seq(0,1,length.out=35), col="darkorchid", border=NA, main=valid_features[1], las=1, xlab="VAF", ylab="Number samples", add=T)
+```
+
+##3. Burden estimation from oligoclonal whole-genome data (Fig 3B)
+
+Estimation of mutation burden per cell from oligoclonal samples is complicated. As described in detail in the Supplementary Material, in this manuscript we used two different approaches that both yield lower bound estimates: (1) we can integrate allele frequencies as in PMID:25999502 and PMID:30337457, (2) we can identify the major subclones present in a sample and quantify the number of mutations attributed to the major subclone. To do the latter, we use the same beta-binomial mixture model used in the analysis of von Brunn's nests and lymphocyte aggregates above. The code below generates Fig 3B from the manuscript.
+
+```{r fig_Fig3B, fig.height = 4.5, fig.width = 4}
+estimate_lowerbound_burden = function(caveman_file, pindel_file, coding_only=F) {
+    
+    muts.cave = read.table(caveman_file, header=1, sep="\t", stringsAsFactors=F)
+    muts.pind = read.table(pindel_file, header=1, sep="\t", stringsAsFactors=F)
+    
+    # Calculating VAFs for the Caveman calls
+    counts = as.matrix(muts.cave[,c("gt_FAZ","gt_FCZ","gt_FGZ","gt_FTZ")]) + as.matrix(muts.cave[,c("gt_RAZ","gt_RCZ","gt_RGZ","gt_RTZ")])
+    muts.cave$mut_dep = NA
+    muts.cave$all_dep = rowSums(counts)
+    nts = c(A=1,C=2,G=3,T=4)
+    for (j in 1:nrow(muts.cave)){ muts.cave$mut_dep[j] = counts[j,nts[muts.cave$ALT[j]]] }
+    muts.cave$vaf = muts.cave$mut_dep / muts.cave$all_dep
+    
+    # Calculating VAFs for the Pindel calls
+    muts.pind$mut_dep = muts.pind$gt_MTR
+    muts.pind$all_dep = muts.pind$gt_MTR + muts.pind$gt_WTR
+    muts.pind$vaf = muts.pind$mut_dep / muts.pind$all_dep
+    
+    # Merging subs and indels
+    muts.cave = muts.cave[,c("sampleID","CHROM","POS","REF","ALT","mut_dep","all_dep","vaf")]
+    muts.pind = muts.pind[,c("sampleID","CHROM","POS","REF","ALT","mut_dep","all_dep","vaf")]
+    muts = rbind(muts.cave, muts.pind)
+    colnames(muts) = c("sampleID","chr","pos","ref","mut","mut_dep","all_dep","vaf")
+    
+    # Restricting calls to dndscv coding regions
+    if (coding_only==T) {
+        data("refcds_hg19", package="dndscv")
+        gr_muts = GenomicRanges::GRanges(muts$chr, IRanges::IRanges(muts$pos,muts$pos))
+        ol = as.data.frame(GenomicRanges::findOverlaps(gr_muts, gr_genes, type="any", select="all"))
+        muts = muts[ol[,1],] # Duplicating subs if they hit more than one gene
+    }
+    
+    urot_ids = as.vector(lcmdata$SupplierSampleName[lcmdata$Feature=="Urothelium" & as.vector(lcmdata$Donor) %in% patientdata$external_id[patientdata$patient_type=="transplant"]])
+    m2 = muts[which(muts$chr %in% c(1:21,"22") & muts$sampleID %in% urot_ids), ] # Only urothelium samples from transplant donors
+    maux = split(m2,f=m2$sampleID)
+    
+    bigclone = data.frame(sampleID=names(maux), bigclone=NA, clone_subs=NA, clone_inds=NA, all_subs=NA, all_inds=NA, sum2vaf_subs=NA, sum2vaf_inds=NA)
+    for (j in 1:length(maux)) {
+        mm = as.matrix(maux[[j]][,c("mut_dep","all_dep")]) # mismatch count table
+        clusters = vafclusters_mixbbin(mm, num_runs=50, bb_rho=1e-4, min_vafdist=0.05)
+        bigclone$bigclone[j] = max(clusters$m_est)
+        issub = (maux[[j]]$ref %in% c("A","C","G","T") & maux[[j]]$mut %in% c("A","C","G","T"))
+        bigclone$sum2vaf_subs[j] = sum(2*maux[[j]]$vaf[issub])
+        bigclone$sum2vaf_inds[j] = sum(2*maux[[j]]$vaf[!issub])
+        bigclone$all_subs[j] = bigclone$clone_subs[j] = sum(issub)
+        bigclone$all_inds[j] = bigclone$clone_inds[j] = sum(!issub)
+        if (length(clusters$m_est)>1) {
+            bigclone$clone_subs[j] = colSums(array(clusters$probs[issub,], dim=c(sum(issub),ncol(clusters$probs))))[which.max(clusters$m_est)] # Sum of the assignment probs to the major clone for subs
+            bigclone$clone_inds[j] = colSums(array(clusters$probs[!issub,], dim=c(sum(!issub),ncol(clusters$probs))))[which.max(clusters$m_est)] # Sum of the assignment probs to the major clone for indels
+        }
+        #print(j); print(clusters$m_est)
+    }
+    bigclone$medianvaf = sapply(maux, function(x) median(x$vaf))
+    age = setNames(patientdata$age, patientdata$internal_id)
+    gender = setNames(patientdata$gender, patientdata$internal_id)
+    bigclone$age = age[substr(bigclone$sampleID,1,7)]
+    bigclone$gender = gender[substr(bigclone$sampleID,1,7)]
+    
+    bigclone$lowbound_subs = bigclone$sum2vaf_subs # Default
+    bigclone$lowbound_subs[bigclone$bigclone>0.25] = pmax(bigclone$lowbound_subs[bigclone$bigclone>0.25], bigclone$clone_subs[bigclone$bigclone>0.25]) # Or the major subclone, if appropriate
+    bigclone$lowbound_inds = bigclone$sum2vaf_inds # Default
+    bigclone$lowbound_inds[bigclone$bigclone>0.25] = pmax(bigclone$lowbound_inds[bigclone$bigclone>0.25], bigclone$clone_inds[bigclone$bigclone>0.25]) # Or the major subclone, if appropriate
+    bigclone$lowbound_all = bigclone$lowbound_subs + bigclone$lowbound_inds
+
+    return(bigclone)
+}
+
+# Whole-genomes
+caveman_file = "bld_wgs_caveman_calls.tsv"
+pindel_file = "bld_wgs_pindel_calls.tsv"
+bigclone.wgs = estimate_lowerbound_burden(caveman_file, pindel_file)
+genome_length = 2867437753 # Ungapped length of GRCh37
+donor.split = split(bigclone.wgs, substr(bigclone.wgs$sampleID,1,7))
+donor.df = data.frame(donorID=names(donor.split), age=sapply(donor.split, function(x) unique(x$age)), meanburden=sapply(donor.split, function(x) mean(x$lowbound_all)), allmuts=sapply(donor.split, function(x) mean(x$all_subs+x$all_inds)), stringsAsFactors=F)
+donor.df = donor.df[order(donor.df$meanburden), ]
+
+# Plot
+pcawg_counts = read.table("pcawg_blca_mutation_counts.tsv", header=1, sep="\t", stringsAsFactors=F)
+
+b1 = sort(donor.df$meanburden)
+b2 = sort(donor.df$allmuts)
+b3 = sort(pcawg_counts$Total)
+burden_vec = c(b1,NA,b2,NA,b3)
+colvec = c(rep("cadetblue", length(b1)),NA,rep("deepskyblue4",length(b2)),NA,rep("lightsalmon2",length(b3)))
+plot(1:length(burden_vec), burden_vec, pch=16, col=colvec, log="y", las=1, ylab="Mutations/genome", xlab="")
+abline(v=which(is.na(burden_vec)))
+axis(side=4, at=c(0.05,0.1,0.2,0.5,1,2,5,10,20)*(genome_length/1e6), labels=c(0.05,0.1,0.2,0.5,1,2,5,10,20), las=1)
+```
+
+##4. Testing association between mutational signatures and smoking or alcohol consumption
+
+The code below performs mixed-effect regression analyses to test for associations between mutational signatures and smoking or alcohol consumption. As described in the Supplementary Material, this analysis identified a possible association between signature A and smoking (P=9.406e-05, q-value=0.00075; P=0.003311 using pack years).
+
+```{r}
+# Using signature exposures without priors
+sigc = readRDS("bladder_de_novo_mean_assignment_per_sample.rds")
+sigc = data.frame("sampleid"=rownames(sigc), sigA=sigc[,2], sigB=sigc[,3], apob=sigc[,4], sigC=sigc[,5], row.names=NULL, stringsAsFactors=F)
+
+# Using signature exposures with priors
+#sigc = read.table("bladder_priors_001000_mean_assignment_per_sample.tsv", header=1, sep="\t", stringsAsFactors = F)[-(1:5),] # Loading the table and removing the parent nodes
+#sigc = data.frame("sampleid"=rownames(sigc), sigA=sigc$N2, sigB=sigc$N1, apob=sigc$P2+sigc$P4, sigC=sigc$N3, SBS5=sigc$P3, row.names=NULL, stringsAsFactors=F)
+
+# Annotating patient-level data
+patient_file = "bladder_patient_info_2019-10-30.csv"
+patientdata = read.table(patient_file, header=1, sep=",", stringsAsFactors=F)
+sigc$patientpd = substr(sigc$sampleid,1,7)
+
+# Adding metadata
+metadata = read.table("Patient_metadata_TableS1.csv", header=1, sep=",", stringsAsFactors=F)
+sigc$paper_id = setNames(patientdata$paper_id,patientdata$internal_id)[sigc$patientpd]
+sigc$patient_type = setNames(patientdata$patient_type,patientdata$internal_id)[sigc$patientpd]
+sigc$age = setNames(patientdata$age,patientdata$internal_id)[sigc$patientpd]
+sigc$gender = setNames(patientdata$gender,patientdata$internal_id)[sigc$patientpd]
+
+# Smoker annotation
+metadata$smokingclass = "Never/low"
+metadata$smokingclass[metadata$packyears>=10] = "Heavy"
+smoking = setNames(metadata$Tobacco.intake, metadata$Donor.ID)
+smokingclass = setNames(metadata$smokingclass, metadata$Donor.ID)
+sigc$smoking = smoking[sigc$paper_id]
+sigc$smokingclass = smokingclass[sigc$paper_id]
+
+# Alcohol
+alcohol = setNames(metadata$Alcohol.intake., metadata$Donor.ID)
+alcoholnum = setNames(rep(NA,nrow(metadata)), metadata$Donor.ID)
+alcoholnum[alcohol %in% c("Rare","None")] = 1
+alcoholnum[alcohol %in% c("Light","Moderate")] = 2
+alcoholnum[alcohol=="Heavy"] = 3
+sigc$alcoholnum = alcoholnum[sigc$paper_id]
+```
+
+Mixed-effect regression model.
+
+```{r}
+library(lme4)
+## Smoking
+pvec = NULL
+# SigA vs smoking
+model1 = lmer(sigA ~ patient_type + gender + smokingclass + (1|paper_id), data=sigc, REML=F)
+model1.null = lmer(sigA ~ patient_type + gender + (1|paper_id), data=sigc, REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]); print(an) # SigA vs smokingclass (P=9.406e-05)
+# SigB vs smoking
+model1 = lmer(sigB ~ patient_type + gender + smokingclass + (1|paper_id), data=sigc, REML=F)
+model1.null = lmer(sigB ~ patient_type + gender + (1|paper_id), data=sigc, REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # SigB vs smokingclass (P=0.6386)
+# SigC vs smoking
+model1 = lmer(sigC ~ patient_type + gender + smokingclass + (1|paper_id), data=sigc, REML=F)
+model1.null = lmer(sigC ~ patient_type + gender + (1|paper_id), data=sigc, REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # SigC vs smokingclass (P=0.2223)
+# APOBEC vs smoking
+model1 = lmer(apob ~ patient_type + gender + smokingclass + (1|paper_id), data=sigc, REML=F)
+model1.null = lmer(apob ~ patient_type + gender + (1|paper_id), data=sigc, REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # APOBEC vs smokingclass (P=0.07201)
+
+## Alcohol
+# SigA vs alcohol
+model1 = lmer(sigA ~ gender + smokingclass + alcoholnum + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+model1.null = lmer(sigA ~ gender + smokingclass + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # SigA vs alcoholnum (P=0.6046)
+# SigB vs alcohol
+model1 = lmer(sigB ~ gender + smokingclass + alcoholnum + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+model1.null = lmer(sigB ~ gender + smokingclass + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # SigB vs alcoholnum (P=0.9398)
+# SigC vs alcohol
+model1 = lmer(sigC ~ gender + smokingclass + alcoholnum + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+model1.null = lmer(sigC ~ gender + smokingclass + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # SigC vs alcoholnum (P=0.2985)
+# APOBEC vs alcohol
+model1 = lmer(apob ~ gender + smokingclass + alcoholnum + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+model1.null = lmer(apob ~ gender + smokingclass + (1|paper_id), data=sigc[sigc$patient_type=="transplant",], REML=F)
+an = anova(model1,model1.null); pvec = c(pvec,an[[8]][2]) # APOBEC vs alcoholnum (P=0.7864)
+
+# Multiple testing
+qvals = p.adjust(pvec, method="BH")
+
+# SigA vs smoking using pack-years
+smokingnum = setNames(rep(0,length(smoking)), names(smoking))
+smokingnum[smoking=="Non-smoker"] = 0
+sm = unlist(regmatches(smoking, gregexpr("[[:digit:]]+", smoking)))
+smokingnum[names(sm)] = as.numeric(sm)
+sigc$smokingnum = smokingnum[sigc$paper_id]
+
+model1 = lmer(sigA ~ patient_type + gender + smokingnum + (1|paper_id), data=sigc, REML=F)
+model1.null = lmer(sigA ~ patient_type + gender + (1|paper_id), data=sigc, REML=F)
+anova(model1,model1.null) # SigA vs smokingnum (P=0.003311)
+```
+
+Plotting the association between smoking and sigA.
+
+```{r fig_smoking_sigA, fig.height = 4, fig.width = 9}
+par(mfrow=c(1,3))
+
+# Boxplot
+boxplot(sigc$sigA~sigc$smokingclass, notch=F, las=1, xlab="Smoking status", ylab="Relative contribution of SigA (per WGS)", ylim=c(0,0.7))
+
+# Boxplot aggregating WGS by individual
+aux = split(sigc, f=sigc$paper_id)
+meansigA = sapply(aux, function(x) mean(x$sigA)) # Mean sigA relative contribution per patient
+boxplot(meansigA~smokingclass[names(meansigA)], las=1, xlab="Smoking status", ylab="Relative contribution of SigA (per individual)", ylim=c(0,0.7))
+
+# Scatter plot of SigA contribution vs pack years (coloured by individual)
+library(RColorBrewer)
+colvec = setNames(c(brewer.pal(8,"Set1"),brewer.pal(12,"Set3")), unique(sigc$paper_id))
+plot(sigc$smokingnum, sigc$sigA, col=colvec[sigc$paper_id], las=1, xlab="Pack years", ylab="Relative contribution SigA (per WGS)", pch=16, ylim=c(0,0.7))
+```
