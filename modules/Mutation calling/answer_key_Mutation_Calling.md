@@ -108,6 +108,10 @@ Knowing this, which of the following Venn Diagrams best represents our
 data and the expected number of variants in the germline and somatic VCFs?
 ![](images/somatic_venns.png)
 
+```
+The correct answer is B.
+```
+
 ## Preprocessing (read alignment, duplicate marking, sorting, indexing)
 Our raw sequencing reads are random pieces of DNA derived from our tumor and normal tissues.
 To make use of them, we need to align our sequences to a reference genome to produce _alignments_.
