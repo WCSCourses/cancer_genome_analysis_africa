@@ -175,15 +175,15 @@ We will also add a Read Group to our data. This step is essential for making our
 each read with the Read Group so that callers know how to use reads in their statistical models. The Read Group takes the form
 of a string so we must enclose in single quotes. The read group is specified with the `-R ` argument.
 
-To align our reads, we run the following command:
+To align our reads, we run the following command from inside the analysis directory:
 ```bash
 bwa mem \
     -Y \
     -t 2 \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' \
-    ~/references/Homo_sapiens_assembly38.fasta \
-    /home/manager/data/module_2/chr22.TCRBOA6-Normal_1.fastq.gz /home/manager/data/module_2/chr22.TCRBOA6-Normal_2.fastq.gz \
+    references/Homo_sapiens_assembly38.fasta \
+    chr22.TCRBOA6-Normal_1.fastq.gz chr22.TCRBOA6-Normal_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Normal.bam -
@@ -223,8 +223,8 @@ bwa mem \
     -t 2 \
     -K 100000 \
     -R '@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1' \
-    ~/references/Homo_sapiens_assembly38.fasta \
-    /home/manager/data/module_2/chr22.TCRBOA6-Tumor_1.fastq.gz /home/manager/data/module_2/chr22.TCRBOA6-Tumor_2.fastq.gz \
+    references/Homo_sapiens_assembly38.fasta \
+    chr22.TCRBOA6-Tumor_1.fastq.gz chr22.TCRBOA6-Tumor_2.fastq.gz \
     | samtools sort \
     -@ 2 \
     -o chr22.TCRBOA6-Tumor.bam -
