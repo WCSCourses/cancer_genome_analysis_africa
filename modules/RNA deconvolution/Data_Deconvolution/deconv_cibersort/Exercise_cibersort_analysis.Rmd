@@ -11,7 +11,7 @@ output:
 
 #Load libPaths
 .libPaths(c("~/deconv_cibersort/deconv_cibersort/lib/","/home/manager/R/x86_64-pc-linux-gnu-library/4.2"))
-pkgs <- c("survival", "survminer", "data.table", "dplyr", "ggplot2", "e1071", "parallel", "preprocessCore", "corrplot", "RColorBrewer", "parallel", "ggdendro")
+pkgs <- c("survival", "survminer", "data.table", "dplyr", "ggplot2", "e1071", "parallel", "preprocessCore", "corrplot", "RColorBrewer", "parallel", "ggdendro", "tibble" )
 #install.packages(pkgs)
 
 ```
@@ -50,8 +50,8 @@ LM22 is the signature genes file we used for Cibersort analyses (https://www.ncb
 ```{r}
 
 lm22_signatures <- as.data.frame(fread("data/lm22.txt"))
-print(head(lm22_signatures[,1:4]))
 lm22_signatures <- tibble::column_to_rownames(lm22_signatures, "V1")
+print(head(lm22_signatures[,1:4]))
 
 #Bulk TCGA-SKCM metastatic
 skcm_bulk <- as.data.frame(fread("data/bulk.txt"))
@@ -76,7 +76,7 @@ i)   perm = No. permutations; set to >=100 to calculate p-values (default = 0)
 ```{r}
 set.seed(42)
 h1 <- Sys.time()
-results.cibersort <- CIBERSORT(lm22_signatures, skcm_bulk, perm = 100, absolute = F, QN = F)
+results.cibersort <- CIBERSORT(lm22_signatures, skcm_bulk, perm = 1, absolute = F, QN = F)
 h2 <- Sys.time()
 print(h2 - h1)
 
@@ -100,8 +100,6 @@ subtipos <- read_csv("data/subtipos.csv")
 
 #Identify the quartile of each sample in each cell type
 
-rownames(results.sign) <- substr(rownames(results.sign),1,12)
-
 results.sign1 <- results.sign
 for (i in 1:length(colnames(results.sign))) {
   for (j in 1:5) {
@@ -110,7 +108,10 @@ for (i in 1:length(colnames(results.sign))) {
   }
 }
 
+
 results.sign$Mixture <- rownames(results.sign)
+results.sign$Mixture <- gsub("\\.", "-", results.sign$Mixture)
+results.sign$Mixture <- substr(results.sign$Mixture,1,12)
 
 #Aggregate Cibersort result with clinical and survival data according to patient ID
 
@@ -131,9 +132,7 @@ colnames(forest_data)[29] = "Subtype_Mutation"
 # Check the columns (variable names) present in the clinical dataset
 names(forest_data)
 
-
-
-#Filter for columns sample and Stage
+#Filter for columns sample and Subtype mutation
 data_barplot = forest_data[,c(23,29)]
 
 #Make patient IDs unique values
@@ -175,6 +174,7 @@ The cox proportional-hazards model is one of the most important methods used for
 
 References: 
 http://www.sthda.com/english/wiki/cox-proportional-hazards-model
+
 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2394262/
 
 
@@ -251,7 +251,7 @@ Statistical significance. The column marked “z” gives the Wald statistic val
 
 The regression coefficients. The second feature to note in the Cox model results is the the sign of the regression coefficients (coef). A positive sign means that the hazard (risk of death) is higher, and thus the prognosis worse, for subjects with higher values of that variable. 
 
-Hazard ratios. The exponentiated coefficients (exp(coef) = exp(-0.53) = 0.59), also known as hazard ratios, give the effect size of covariates. For example, being macrophages M1 reduces the hazard by a factor of 0.78. Being Macrophages M1 is associated with good prognostic.
+Hazard ratios. The exponentiated coefficients (exp(coef) = exp(-0.53) = 0.59), also known as hazard ratios, give the effect size of covariates. For example, being TCD4 memory activated reduces the hazard by a factor of 0.78. Being TCD4 memory activated is associated with good prognostic.
 
 Confidence intervals of the hazard ratios. The summary output also gives upper and lower 95% confidence intervals for the hazard ratio (exp(coef)).
 
@@ -260,7 +260,7 @@ Global statistical significance of the model. Finally, the output gives p-values
 
 
 ```{r}
-######## Levels expressions M1 macrophages in survival Analysis (Kaplan-Meier plot)
+######## Levels expressions M1 macrophages and T cells CD4 memory activated in survival Analysis (Kaplan-Meier plot)
 
 
 library(ggplot2)
@@ -281,5 +281,19 @@ ggsurvplot(fit, palette = c( "#DB7093","#20b2aa"), xlab = "Survival time in year
            font.ytickslab = c(10))
 
 
+```
+
+```{r}
+forest_data$T_cells_CD4_memory_activated_group = ifelse(forest_data$T_cells_CD4_memory_activated >= mean(forest_data$T_cells_CD4_memory_activated), "High", "Low")
+
+#Having fit a Cox model to the data, it’s possible to visualize the predicted survival proportion at any given point in time for a particular risk group. The function survfit() estimates the survival proportion, by default at the mean values of covariates.
+
+fit <- survfit(Surv(OS.time, OS) ~ T_cells_CD4_memory_activated_group, data = forest_data)
+ggsurvplot(fit, palette = c( "#DB7093","#20b2aa"), xlab = "Survival time in years",
+           surv.median.line = c("hv"), cumcensor = F,  conf.int = F ,risk.table = TRUE, pval = T,
+           title = 'Overall survival: TCGA-SKCM (T cells CD4 memory activated)', risk.table.y.text.col = T, # colour risk table text annotations.
+           risk.table.y.text = FALSE, font.main = c(10), font.legend = c(10), font.y = c(10),font.x = c(10), font.caption = c(10), 
+           font.tickslab = c(10),legend.labs=c("T cells CD4 memory activated High","T cells CD4 memory activated Low"), fontsize = 3,risk.table.height = 0.3, pval.size = 4, censor.size = 2,
+           font.ytickslab = c(10))
 ```
 
