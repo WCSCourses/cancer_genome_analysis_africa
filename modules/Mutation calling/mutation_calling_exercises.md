@@ -17,7 +17,9 @@ In this practical, we will:
 4. Look at our variants in IGV to assess their quality.
 5. Build an intuition for variant quality control.
 
-# Input data
+# Set up and configuration
+
+## Input data
 
 When running the course, we host data inside a VM. However, sometimes this data is out-of-date and instructors
 will provide a link to download the updated material. Please ask the course instructors for access if needed. 
@@ -28,8 +30,21 @@ wget <file>
 ```
 
 
-In the VM, we have a directory titled /home/manager/data/module_2.
+In the VM, we have a directory titled `/home/manager/data/alignment&variant_calling`.
 This directory contains data from the [Texas Cancer Research Biobank Open Access project.](http://stegg.hgsc.bcm.edu/open.html).
+Please move this directory to a new name so that we don't have to escape the '&' character:
+
+```bash
+cd ~
+cd data
+
+mv alignment&variant_calling module_2
+
+```
+
+If you're on your own machine, create a directory named `module_2` and store your data there.
+
+
 We're using whole-genome sequenced data from Case 006, a woman in her 60s who presented with neuroendocrine carcinoma
 of the pancreas and received no prior treatment.
 
@@ -46,7 +61,58 @@ As we go through this tutorial, you'll run the commands to generate each of thes
 computational tasks since the data needed is already present. As this is standard whole-genome data, you can also use this for 
 testing and learning other software so long as you follow the data access agreement rules.
 
-# Installing IGV
+### Backup public data
+The following links contain the backup data available publicly. Please download these into the `module_2` directory.
+
+```bash
+cd module_2
+```
+
+Tarball of folder containing references: `https://r2-public-worker.atacama.workers.dev/references.tar`
+
+Tarball of input data (not in a folder): `https://r2-public-worker.atacama.workers.dev/wgs_chr22_TCRBOA6_somatic_data.tar`
+
+To download these:
+
+```bash
+wget https://r2-public-worker.atacama.workers.dev/wgs_chr22_TCRBOA6_somatic_data.tar
+wget https://r2-public-worker.atacama.workers.dev/wgs_chr22_TCRBOA6_somatic_data.tar
+
+tar xvf references.tar
+tar xvf wgs_chr22_TCRBOA6_somatic_data.tar
+```
+
+After untarring these files, the following data / directory will be present in your `module_2` directory:
+
+```bash
+references/
+backup.chr22_TCRBOA6-Normal.bam
+backup.chr22_TCRBOA6-Normal.markdups.bam
+backup.chr22_TCRBOA6-Normal.markdups.baseRecal.bai
+backup.chr22_TCRBOA6-Normal.markdups.baseRecal.bam
+backup.chr22_TCRBOA6-Normal.markdups.baseRecal.bam.bai
+backup.chr22_TCRBOA6-Normal.markdups.BQSR-REPORT.txt
+backup.chr22_TCRBOA6-Normal.markdups.metrics.txt
+backup.chr22_TCRBOA6-Tumor.bam
+backup.chr22_TCRBOA6-Tumor.markdups.bam
+backup.chr22_TCRBOA6-Tumor.markdups.baseRecal.bai
+backup.chr22_TCRBOA6-Tumor.markdups.baseRecal.bam
+backup.chr22_TCRBOA6-Tumor.markdups.baseRecal.bam.bai
+backup.chr22_TCRBOA6-Tumor.markdups.BQSR-REPORT.txt
+backup.chr22_TCRBOA6-Tumor.markdups.metrics.txt
+backup.chr22_TCRBOA6-Tumor.TCRBOA6-Normal.funcotated.maf
+backup.chr22_TCRBOA6-Tumor.TCRBOA6-Normal.vcf
+backup.chr22_TCRBOA6-Tumor.TCRBOA6-Normal.vcf.idx
+backup.chr22_TCRBOA6-Tumor.TCRBOA6-Normal.vcf.stats
+chr22.TCRBOA6-Normal_1.fastq.gz
+chr22.TCRBOA6-Normal_2.fastq.gz
+chr22.TCRBOA6-Tumor_1.fastq.gz
+chr22.TCRBOA6-Tumor_2.fastq.gz
+```
+
+The backup files are there in case you don't want to run long-running commands. The FASTQs are present to run the tutorial below.
+
+## Installing IGV
 
 *How to install IGV on your machine*
 1. Open Firefox
@@ -58,8 +124,7 @@ testing and learning other software so long as you follow the data access agreem
 6. `unzip IGV_Linux_2.14.1_WithJava.zip` to uncompress
 7. `sh ~/Downloads/IGV_Linux_2.14.1/igv.sh` to run IGV
 
-# Installing GATK
-
+## Installing GATK
 
 GATK is installed in the course VM, but if you need to install it from scratch:
 ```bash
@@ -72,7 +137,23 @@ unzip gatk-4.2.6.1.zip
 ## The GATK executable is now in the gatk-4.2.6.1 directory
 ```
 
-The GATK is now installed in `~/gatk-4.2.6.1/gatk`.
+The GATK is now installed in `~/gatk-4.2.6.1/`.
+
+## Setting up your environment and running the analysis as a script
+
+The following BASH commands will help set up our environment to make running
+the tutorial more intuitive. It assumes you have installed GATK in your home directory:
+
+```bash
+gatk_path=~/gatk-4.2.6.1/
+
+## Add GATK to path
+PATH=${PATH}:${gatk_path}
+```
+
+In addition, a script for the entire alignment, qc, and calling process
+has been integrated into a single BASH script which can be found
+in this repository, named `calling_and_annotation_pipeline.sh`.
 
 # Practical
 Below, we ask some concept and knowledge questions before moving on to analyzing a match tumor-normal pair.
@@ -144,13 +225,14 @@ BWA contains several algorithms for read alignment. In this tutorial, we'll use 
 and clever heuristics to be both faster and more accurate than the `aln/samse/sampe` and `bwasw` algorithms.
 
 
+**Note: The references have already been indexed. You do not need to run the below command.**
 BWA requires an input reference genome as well as several indexes it uses to efficiently align reads. Today, we'll be using the `Homo_sapiens_assembly38.fasta` reference from the Broad Institute. These indexes are provided for you
 in the `~/references/` directory and are also downloadable from the [Broad Resource Bundle site](https://console.cloud.google.com/storage/browser/genomics-public-data/resources/broad/hg38/v0;tab=objects?prefix=&forceOnObjectsSortingFiltering=false). If you needed to generate them for a new reference genome, you could use the `bwa index` command like so:
 
 ```bash
 bwa index ~/references/Homo_sapiens_assembly38.fasta
 ```
-**Note**: This command will take a very long time to run on the VM, and we've precomputed the indices, so there's no need to run it again.
+This command will take a very long time to run on the VM, and we've precomputed the indices, so there's no need to run it again.
 Luckily, it only needs to be run once per reference, and can be reused for every new sample.
 Expected runtime: roughly 1.5 hours.
 
@@ -175,18 +257,18 @@ We will also add a Read Group to our data. This step is essential for making our
 each read with the Read Group so that callers know how to use reads in their statistical models. The Read Group takes the form
 of a string so we must enclose in single quotes. The read group is specified with the `-R ` argument.
 
-To align our reads, we run the following command from inside the analysis directory:
+To align our reads, we run the following command from inside the analysis directory. We prefix it with `time` to report how long the command takes:
 ```bash
-bwa mem \
-    -Y \
+time bwa mem -Y \
     -t 2 \
     -K 100000 \
-    -R '@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1' \
+    -R "@RG\tID:TCRBOA6-Normal-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Normal\tPU:TCRBOA6-Normal-RG1" \
     references/Homo_sapiens_assembly38.fasta \
     chr22.TCRBOA6-Normal_1.fastq.gz chr22.TCRBOA6-Normal_2.fastq.gz \
     | samtools sort \
+    -O BAM \
     -@ 2 \
-    -o chr22.TCRBOA6-Normal.bam -
+    -o chr22.TCRBOA6-Normal.bam
 ```
 Expected runtime: 30-50 minutes.
 
@@ -218,16 +300,17 @@ Lastly, we need to do the same process for our tumor. This will take longer to a
 remember, these files have already been provided for you).
 
 ```bash
-bwa mem \
+time bwa mem \
     -Y \
     -t 2 \
     -K 100000 \
-    -R '@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1' \
+    -R "@RG\tID:TCRBOA6-Tumor-RG1\tLB:lib1\tPL:Illumina\tSM:TCRBOA6-Tumor\tPU:TCRBOA6-Tumor-RG1" \
     references/Homo_sapiens_assembly38.fasta \
     chr22.TCRBOA6-Tumor_1.fastq.gz chr22.TCRBOA6-Tumor_2.fastq.gz \
     | samtools sort \
+    -O BAM \
     -@ 2 \
-    -o chr22.TCRBOA6-Tumor.bam -
+    -o chr22.TCRBOA6-Tumor.bam
 ```
 Expected runtime: 60-90 minutes.
 
@@ -239,24 +322,24 @@ can distort our variant calls downstream if not removed.
 We'll use the Picard MarkDuplicates tool to mark duplicates. Conveniently, this is now integrated into the Genome Analysis Toolkit.
 
 ```bash
-~/gatk-4.2.6.1/gatk MarkDuplicates \
+time gatk MarkDuplicates \
     --java-options -Xmx4g \
-    -I chr22.TCRBOA6-Normal.bam\
+    -I chr22.TCRBOA6-Normal.bam \
     -O chr22.TCRBOA6-Normal.markdups.bam \
-    -M chr22.TCRBOA6-Normal.metrics.txt
+    -M chr22.TCRBOA6-Normal.markdups.metrics.txt
 ```
 
 We'll need to do the same for our tumor sample:
 
 ```bash
-~/gatk-4.2.6.1/gatk MarkDuplicates \
+time gatk MarkDuplicates \
     --java-options -Xmx4g \
     -I chr22.TCRBOA6-Tumor.bam\
     -O chr22.TCRBOA6-Tumor.markdups.bam \
-    -M chr22.TCRBOA6-Tumor.metrics.txt
+    -M chr22.TCRBOA6-Tumor.markdups.metrics.txt
 ```
 
-Expected runtime: 1 minute per sample
+Expected runtime: 5 minutes per sample
 
 The MarkDuplicates tool prints some statistics to stdout / stderr when it's finished. How long did the run take?
 
@@ -286,22 +369,22 @@ The BQSR process will normalize the quality scores within a BAM file based on a 
 (especially indels), resulting in more accurate variant calls downstream.
 
 ```bash
-~/gatk-4.2.6.1/gatk BaseRecalibrator \
+time gatk BaseRecalibrator \
     --java-options -Xmx4g \
     --input chr22.TCRBOA6-Normal.markdups.bam \
     --output chr22.TCRBOA6-Normal.markdups.BQSR-REPORT.txt \
-    --known-sites ~/references/Homo_sapiens_assembly38.known_indels.vcf.gz \
-    --reference ~/references/Homo_sapiens_assembly38.fasta
+    --known-sites references/Homo_sapiens_assembly38.known_indels.vcf.gz \
+    --reference references/Homo_sapiens_assembly38.fasta
 ```
 
 
 ```bash
-~/gatk-4.2.6.1/gatk BaseRecalibrator \
+time gatk BaseRecalibrator \
     --java-options -Xmx4g \
     --input chr22.TCRBOA6-Tumor.markdups.bam \
     --output chr22.TCRBOA6-Tumor.markdups.BQSR-REPORT.txt \
-    --known-sites ~/references/Homo_sapiens_assembly38.known_indels.vcf.gz \
-    --reference ~/references/Homo_sapiens_assembly38.fasta
+    --known-sites references/Homo_sapiens_assembly38.known_indels.vcf.gz \
+    --reference references/Homo_sapiens_assembly38.fasta
 ```
 
 
@@ -319,16 +402,46 @@ it should be the same as we generated for alignment.
 
 ```
 
+
+After running the commands to generate the BQSR report, we need to adjust the base qualities within
+our BAM files. We do this by running the `ApplyBQSR` command in GATK. Again, this is a long-running
+command and the output files will be provided.
+
+```bash
+## Apply BQSR to normal BAM
+time gatk ApplyBQSR \
+    --java-options -Xmx4g \
+    -R references/Homo_sapiens_assembly38.fasta \
+    -I chr22.TCRBOA6-Normal.markdups.bam \
+    --bqsr-recal-file chr22.TCRBOA6-Normal.markdups.BQSR-REPORT.txt \
+    -O chr22.TCRBOA6-Normal.markdups.baseRecal.bam
+```
+
+```bash
+## Apply BQSR to tumor BAM
+time gatk ApplyBQSR \
+    --java-options -Xmx4g \
+    -R references/Homo_sapiens_assembly38.fasta \
+    -I chr22.TCRBOA6-Tumor.markdups.bam \
+    --bqsr-recal-file chr22.TCRBOA6-Tumor.markdups.BQSR-REPORT.txt \
+    -O chr22.TCRBOA6-Tumor.markdups.baseRecal.bam
+```
+
 ## Indexing BAM files
 
 To call variants, we'll need to index our BAM files. We can use the `samtools index`
 command to do so:
 
 ```bash
-samtools index chr22.TCRBOA6-Tumor.markdups.bam
-
-samtools index chr22.TCRBOA6-Normal.markdups.bam
+time samtools index chr22.TCRBOA6-Tumor.markdups.baseRecal.bam
 ```
+Estimated runtime: 40s
+
+
+```bash
+time samtools index chr22.TCRBOA6-Normal.markdups.baseRecal.bam
+```
+Estimated runtime: 40s
 
 Our BAM index is kind of like the index of a book. What do you think its coordinate system is?
 
@@ -348,10 +461,10 @@ tell MuTect2 to only call that interval using `-L chr22`.
 ```bash
 ~/gatk-4.2.6.1/gatk Mutect2 \
     -R ~/references/Homo_sapiens_assembly38.fasta \
-    --input chr22.TCRBOA6-Tumor.markdups.bam \
+    --input chr22.TCRBOA6-Tumor.markdups.baseRecal.bam \
     --tumor-sample TCRBOA6-Tumor \
-    --input chr22.TCRBOA6-Normal.markdups.bam \
-    --normal-sample chr22.TCRBOA6-Normal \
+    --input chr22.TCRBOA6-Normal.markdups.baseRecal.bam \
+    --normal-sample TCRBOA6-Normal \
     -L chr22 \
     --output chr22.TCRBOA6-Tumor.TCRBOA6-Normal.vcf
 ```

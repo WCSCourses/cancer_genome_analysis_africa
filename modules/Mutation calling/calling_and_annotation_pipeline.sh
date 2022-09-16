@@ -28,6 +28,8 @@ inputNormal_FASTQ_2=chr22.TCRBOA6-Normal_2.fastq.gz
 inputNormalSampleName=TCRBOA6-Normal
 
 ## Prefix the output with the following prefix:
+## you can leave this as "" if you don't want a prefix
+## or make it a path to use a path (but make sure the path exists).
 outputPrefix="backup.chr22_"
 
 threads=8
