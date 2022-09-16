@@ -76,7 +76,7 @@ To download these:
 
 ```bash
 wget https://r2-public-worker.atacama.workers.dev/wgs_chr22_TCRBOA6_somatic_data.tar
-wget https://r2-public-worker.atacama.workers.dev/wgs_chr22_TCRBOA6_somatic_data.tar
+wget https://r2-public-worker.atacama.workers.dev/references.tar
 
 tar xvf references.tar
 tar xvf wgs_chr22_TCRBOA6_somatic_data.tar
